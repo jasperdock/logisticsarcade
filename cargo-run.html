@@ -1171,6 +1171,16 @@ function CargoRun() {
             background: "transparent", border: "1px solid #333", borderRadius: 10,
             padding: "14px 20px", fontSize: 13, color: "#555", cursor: "pointer",
           }}>← BACK</button>
+          <a href="index.html" style={{
+            background: "transparent", border: "1px solid #2a2a3a", borderRadius: 10,
+            padding: "14px 16px", fontSize: 12, color: "#444",
+            textDecoration: "none", fontFamily: "'Courier New', monospace",
+            display: "flex", alignItems: "center",
+            WebkitTapHighlightColor: "transparent",
+          }}
+            onMouseEnter={e => { e.currentTarget.style.color="#FFD700"; e.currentTarget.style.borderColor="#FFD700"; }}
+            onMouseLeave={e => { e.currentTarget.style.color="#444";    e.currentTarget.style.borderColor="#2a2a3a"; }}
+          >🕹 ARCADE</a>
         </div>
       </div>
     );
@@ -1187,7 +1197,14 @@ function CargoRun() {
         fontFamily: "'Courier New', monospace", color: "#fff", padding: 20,
         backgroundImage: "radial-gradient(ellipse at 50% 0%, #1a1a3e 0%, #0a0a0f 70%)",
       }}>
-        <div style={{ fontSize: 11, letterSpacing: 6, color: "#888", marginBottom: 8 }}>LOGISTICS ARCADE</div>
+        <a href="index.html" style={{
+          fontSize: 11, letterSpacing: 6, color: "#555", marginBottom: 8,
+          textDecoration: "none", display: "block", textAlign: "center",
+          fontFamily: "'Courier New', monospace",
+        }}
+          onMouseEnter={e => e.currentTarget.style.color="#FFD700"}
+          onMouseLeave={e => e.currentTarget.style.color="#555"}
+        >← LOGISTICS ARCADE</a>
         <div style={{
           fontSize: "clamp(42px, 12vw, 80px)", fontWeight: 900, letterSpacing: -2,
           background: "linear-gradient(135deg, #FFD700, #FF8C00)",
@@ -1493,10 +1510,16 @@ function CargoRun() {
             background: "transparent", border: "1px solid #F97316", borderRadius: 10,
             padding: "14px 24px", fontSize: 14, color: "#F97316", cursor: "pointer",
           }}>CONTRACTS</button>
-          <button onClick={() => setPhase("title")} style={{
-            background: "transparent", border: "1px solid #333", borderRadius: 10,
-            padding: "14px 24px", fontSize: 14, color: "#666", cursor: "pointer",
-          }}>MENU</button>
+          <a href="index.html" style={{
+            background: "transparent", border: "1px solid #2a2a3a", borderRadius: 10,
+            padding: "14px 20px", fontSize: 13, color: "#444",
+            textDecoration: "none", fontFamily: "'Courier New', monospace",
+            display: "flex", alignItems: "center",
+            WebkitTapHighlightColor: "transparent",
+          }}
+            onMouseEnter={e => { e.currentTarget.style.color="#FFD700"; e.currentTarget.style.borderColor="#FFD700"; }}
+            onMouseLeave={e => { e.currentTarget.style.color="#444";    e.currentTarget.style.borderColor="#2a2a3a"; }}
+          >🕹 ARCADE</a>
         </div>
       </div>
     );
@@ -1715,6 +1738,24 @@ function CargoRun() {
         </div>
         <DpadButton onClick={() => handleDpad({ x:0, y:1 })} label="▼" />
       </div>
+
+      {/* ARCADE HOME — fixed corner, always accessible */}
+      <a href="index.html" style={{
+        position: "fixed", top: 10, left: 10, zIndex: 999,
+        display: "flex", alignItems: "center", gap: 5,
+        background: "#0d0d14", border: "1px solid #2a2a3a",
+        borderRadius: 7, padding: "6px 10px",
+        fontFamily: "'Courier New', monospace",
+        fontSize: 10, fontWeight: 700, letterSpacing: 1,
+        color: "#555", textDecoration: "none",
+        WebkitTapHighlightColor: "transparent",
+        transition: "border-color 0.15s, color 0.15s",
+      }}
+        onMouseEnter={e => { e.currentTarget.style.color="#FFD700"; e.currentTarget.style.borderColor="#FFD700"; }}
+        onMouseLeave={e => { e.currentTarget.style.color="#555";    e.currentTarget.style.borderColor="#2a2a3a"; }}
+      >
+        ← ARCADE
+      </a>
 
       <style>{`
         @keyframes popIn {

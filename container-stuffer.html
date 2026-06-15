@@ -1328,6 +1328,22 @@
 
   <button class="btn-primary" onclick="startGame()">LOAD CARGO</button>
   <div class="highscore-strip" id="hs-strip">BEST: <span id="hs-val">—</span></div>
+  <a href="index.html" style="
+    margin-top:0.75rem;
+    font-family:'Share Tech Mono',monospace;
+    font-size:11px;
+    letter-spacing:2px;
+    color:var(--text3);
+    text-decoration:none;
+    padding:8px 16px;
+    border:1px solid var(--border);
+    border-radius:5px;
+    transition:color 0.12s,border-color 0.12s;
+    -webkit-tap-highlight-color:transparent;
+  " onmouseover="this.style.color='var(--accent)';this.style.borderColor='var(--accent)'"
+     onmouseout="this.style.color='var(--text3)';this.style.borderColor='var(--border)'">
+    ← ARCADE HOME
+  </a>
 </div>
 
 <!-- GAME SCREEN -->
@@ -1352,6 +1368,18 @@
       <button class="return-btn-cancel" onclick="cancelReturnToMenu()">← STAY</button>
       <button class="return-btn-confirm" onclick="executeReturnToMenu()">RETURN TO MENU</button>
     </div>
+    <a href="index.html" style="
+      display:block;
+      margin-top:10px;
+      text-align:center;
+      font-family:'Share Tech Mono',monospace;
+      font-size:10px;
+      letter-spacing:2px;
+      color:var(--text3);
+      text-decoration:none;
+      padding:8px;
+      border-top:1px solid var(--border);
+    ">← ARCADE HOME</a>
   </div>
 </div>
   <!-- Vessel Cut-Off strip (hidden when no cutoff applies) -->
