@@ -1,0 +1,4472 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>CONTAINER STUFFER — Logistics Arcade</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Share+Tech+Mono&family=Barlow+Condensed:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg: #0a0d12;
+    --bg2: #0f1318;
+    --bg3: #161b22;
+    --panel: #1a2030;
+    --panel2: #1e2535;
+    --border: #2a3448;
+    --border2: #3a4a60;
+    --accent: #e8a020;
+    --accent2: #f0b840;
+    --blue: #3b9eff;
+    --cyan: #20d4e0;
+    --green: #2ecc71;
+    --red: #e74c3c;
+    --orange: #f39c12;
+    --purple: #9b59b6;
+    --text: #c8d4e8;
+    --text2: #7a90b0;
+    --text3: #4a5870;
+    --glow: rgba(232,160,32,0.15);
+    --glass: rgba(26,32,48,0.92);
+    --container-w: 320px;
+    --container-h: 180px;
+    --cell: 32px;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Barlow Condensed', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+
+  .scanlines {
+    position: fixed; inset: 0; pointer-events: none; z-index: 100;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px);
+  }
+
+  /* ===== SCREENS ===== */
+  .screen { display: none; flex-direction: column; min-height: 100vh; }
+  .screen.active { display: flex; }
+
+  /* ===== TITLE SCREEN ===== */
+  #screen-title {
+    align-items: center;
+    justify-content: center;
+    background: radial-gradient(ellipse at 50% 30%, rgba(232,160,32,0.08) 0%, transparent 70%);
+    padding: 2rem 1.5rem;
+    gap: 0;
+  }
+
+  .title-port-bg {
+    position: absolute; top: 0; left: 0; right: 0; height: 200px;
+    overflow: hidden; opacity: 0.12;
+  }
+
+  .title-eyebrow {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 4px;
+    color: var(--accent);
+    text-transform: uppercase;
+    margin-bottom: 0.5rem;
+  }
+
+  .title-logo {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: clamp(42px, 12vw, 64px);
+    font-weight: 700;
+    letter-spacing: -1px;
+    line-height: 0.9;
+    color: #fff;
+    text-align: center;
+    margin-bottom: 0.25rem;
+  }
+  .title-logo span { color: var(--accent); }
+
+  .title-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text2);
+    letter-spacing: 3px;
+    margin-bottom: 2.5rem;
+  }
+
+  .title-container-art {
+    width: 100%;
+    max-width: 340px;
+    margin-bottom: 2rem;
+  }
+
+  .diff-grid {
+    width: 100%;
+    max-width: 340px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-bottom: 2rem;
+  }
+
+  .diff-btn {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: 'Barlow Condensed', sans-serif;
+  }
+  .diff-btn:active { transform: scale(0.98); }
+  .diff-btn.selected, .diff-btn:hover {
+    border-color: var(--accent);
+    background: rgba(232,160,32,0.08);
+  }
+  .diff-icon { font-size: 22px; width: 28px; text-align: center; }
+  .diff-info { flex: 1; }
+  .diff-name {
+    font-size: 15px; font-weight: 600; color: #fff;
+    text-transform: uppercase; letter-spacing: 1px;
+  }
+  .diff-desc { font-size: 12px; color: var(--text2); margin-top: 2px; }
+  .diff-stars { color: var(--accent); font-size: 11px; letter-spacing: 2px; }
+
+  .btn-primary {
+    background: var(--accent);
+    color: #000;
+    border: none;
+    border-radius: 6px;
+    padding: 14px 40px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 20px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.15s;
+    width: 100%;
+    max-width: 340px;
+  }
+  .btn-primary:active { transform: scale(0.97); background: var(--accent2); }
+
+  .highscore-strip {
+    margin-top: 1.5rem;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text3);
+    letter-spacing: 2px;
+  }
+  .highscore-strip span { color: var(--accent); }
+
+  /* ===== GAME SCREEN ===== */
+  #screen-game {
+    flex-direction: column;
+    padding: 0;
+    overflow: hidden;
+  }
+
+  /* TOP HUD */
+  .hud-top {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .hud-round {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text2);
+    letter-spacing: 2px;
+  }
+  .hud-mode {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    flex: 1;
+    text-align: center;
+  }
+  .hud-score-display {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: var(--cyan);
+    letter-spacing: 1px;
+  }
+
+  /* MANIFEST PANEL */
+  .manifest-panel {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 6px 8px 8px;
+    flex-shrink: 0;
+    position: relative;
+  }
+  .manifest-header {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 3px;
+    margin-bottom: 5px;
+  }
+  /* Wrapper that holds arrows + scroll strip */
+  .manifest-scroll-row {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+  /* Arrow buttons */
+  .manifest-arrow {
+    flex-shrink: 0;
+    width: 36px;
+    height: 72px;         /* match card min-height */
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    color: var(--text2);
+    font-size: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    touch-action: manipulation;  /* instant tap, never intercepted by drag system */
+    transition: color 0.12s, border-color 0.12s, opacity 0.15s, background 0.12s;
+    user-select: none;
+    -webkit-user-select: none;
+    flex-direction: column;
+    gap: 0;
+  }
+  .manifest-arrow:active {
+    background: var(--panel2);
+    color: var(--cyan);
+    border-color: var(--cyan);
+    transform: scale(0.94);
+  }
+  .manifest-arrow.hidden {
+    opacity: 0.18;
+    pointer-events: none;
+  }
+  .manifest-items {
+    flex: 1;
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    padding-bottom: 2px;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-x;
+    /* Hide scrollbar — arrows are the primary nav */
+    scrollbar-width: none;
+  }
+  .manifest-items::-webkit-scrollbar { display: none; }
+  .manifest-item {
+    flex-shrink: 0;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 8px 9px;       /* larger vertical padding → taller hit target */
+    min-width: 60px;
+    min-height: 72px;       /* enforce minimum touch target height */
+    text-align: center;
+    cursor: pointer;
+    transition: border-color 0.12s, background 0.12s, box-shadow 0.12s, opacity 0.12s;
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    /* Extend touch target without changing visual size */
+    -webkit-tap-highlight-color: transparent;
+  }
+  .manifest-item.placed {
+    opacity: 0.38;
+    border-color: var(--text3);
+  }
+  .manifest-item.selected {
+    border-color: var(--accent);
+    background: rgba(232,160,32,0.12);
+    box-shadow: 0 0 10px rgba(232,160,32,0.35);
+  }
+  .manifest-item.drag-lifting {
+    border-color: var(--cyan);
+    background: rgba(32,212,224,0.1);
+    box-shadow: 0 0 12px rgba(32,212,224,0.4);
+    transform: scale(1.06);
+  }
+  .manifest-item-icon { font-size: 20px; line-height: 1; pointer-events: none; }
+  .manifest-item-label {
+    font-size: 9px;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    white-space: nowrap;
+    pointer-events: none;
+  }
+  .manifest-item-dims {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 8px;
+    color: var(--text3);
+    pointer-events: none;
+  }
+  .manifest-item-value {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--accent);
+    pointer-events: none;
+  }
+
+  /* MAIN PLAY AREA */
+  .play-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px;
+    overflow: hidden;
+    gap: 8px;
+  }
+
+  /* CONTAINER VIEW */
+  .container-wrapper {
+    position: relative;
+    width: 100%;
+    flex-shrink: 0;
+  }
+  .container-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--text3);
+    letter-spacing: 3px;
+    text-align: center;
+    margin-bottom: 4px;
+  }
+  .container-outer {
+    position: relative;
+    margin: 0 auto;
+    cursor: crosshair;
+  }
+  #container-canvas {
+    display: block;
+    border-radius: 4px;
+  }
+
+  /* SIDE PANEL — stability */
+  .side-panel {
+    width: 100%;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px 10px;
+    flex-shrink: 0;
+  }
+  .side-panel-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: var(--text3);
+    margin-bottom: 8px;
+    text-transform: uppercase;
+  }
+  .stability-bars {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+  .stab-bar-row { display: flex; flex-direction: column; gap: 3px; }
+  .stab-bar-label {
+    font-size: 10px;
+    color: var(--text2);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .stab-bar-track {
+    height: 6px;
+    background: var(--bg);
+    border-radius: 3px;
+    overflow: hidden;
+    position: relative;
+  }
+  .stab-bar-fill {
+    height: 100%;
+    border-radius: 3px;
+    transition: width 0.3s, background 0.3s;
+  }
+
+  /* BOTTOM CONTROLS */
+  .controls-bar {
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    padding: 8px 12px;
+    display: flex;
+    gap: 8px;
+    flex-shrink: 0;
+  }
+  .ctrl-btn {
+    flex: 1;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px 4px;
+    font-family: 'Barlow Condensed', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.12s;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+  }
+  .ctrl-btn:active { transform: scale(0.96); }
+  .ctrl-btn.rotate-btn { color: var(--blue); border-color: var(--blue); }
+  .ctrl-btn.rotate-btn:active { background: rgba(59,158,255,0.15); }
+  .ctrl-btn.reset-btn { color: var(--orange); }
+  .ctrl-btn.ship-btn {
+    background: var(--accent);
+    border-color: var(--accent2);
+    color: #000;
+    font-weight: 700;
+    font-size: 14px;
+    flex: 1.5;
+  }
+  .ctrl-btn.ship-btn:active { background: var(--accent2); }
+  .ctrl-btn.unload-btn { color: var(--red); border-color: var(--red); opacity: 0; pointer-events: none; transition: all 0.15s; }
+  .ctrl-btn.unload-btn.visible { opacity: 1; pointer-events: auto; }
+  .ctrl-btn.unload-btn:active { background: rgba(231,76,60,0.15); transform: scale(0.96); }
+  .ctrl-btn.cancel-btn { color: var(--text2); border-color: var(--border2); opacity: 0; pointer-events: none; transition: all 0.15s; }
+  .ctrl-btn.cancel-btn.visible { opacity: 1; pointer-events: auto; color: var(--cyan); border-color: var(--cyan); }
+  .ctrl-btn.cancel-btn:active { background: rgba(32,212,224,0.1); transform: scale(0.96); }
+  .ctrl-icon { font-size: 18px; }
+  @keyframes penaltyFlash { 0%,100%{color:var(--cyan)} 40%{color:var(--red)} }
+  .penalty-flash { animation: penaltyFlash 0.5s ease; }
+
+  /* ===== HUD MENU BUTTON ===== */
+  .hud-menu-btn {
+    background: none;
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text2);
+    font-size: 15px;
+    width: 30px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+    touch-action: manipulation;
+    transition: color 0.12s, border-color 0.12s;
+    font-family: 'Rajdhani', sans-serif;
+    letter-spacing: 1px;
+    padding: 0;
+  }
+  .hud-menu-btn:active {
+    color: var(--accent);
+    border-color: var(--accent);
+    background: rgba(232,160,32,0.08);
+  }
+
+  /* ===== RETURN TO MENU MODAL ===== */
+  .return-modal {
+    background: var(--panel);
+    border: 1px solid var(--border2);
+    border-radius: 10px;
+    padding: 1.25rem;
+    width: 100%;
+    max-width: 320px;
+  }
+  .return-modal-eyebrow {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: var(--text3);
+    margin-bottom: 6px;
+  }
+  .return-modal-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 19px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 1px;
+    margin-bottom: 4px;
+  }
+  .return-modal-body {
+    font-size: 12px;
+    color: var(--text2);
+    margin-bottom: 14px;
+    line-height: 1.5;
+  }
+  .return-modal-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .return-btn-cancel {
+    flex: 1;
+    background: var(--panel2);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 11px 8px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text);
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.12s;
+    text-align: center;
+  }
+  .return-btn-cancel:active { transform: scale(0.97); }
+  .return-btn-confirm {
+    flex: 1;
+    background: none;
+    border: 1px solid var(--text2);
+    border-radius: 6px;
+    padding: 11px 8px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--text2);
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.12s;
+    text-align: center;
+  }
+  .return-btn-confirm:active {
+    transform: scale(0.97);
+    border-color: var(--text);
+    color: var(--text);
+  }
+  /* ===== ADDITIONAL CARGO MODAL ===== */
+  .addcargo-modal {
+    background: var(--panel); border: 1px solid var(--cyan);
+    border-radius: 10px; padding: 1.25rem; width: 100%; max-width: 340px;
+  }
+  .addcargo-eyebrow {
+    font-family: 'Share Tech Mono', monospace; font-size: 9px;
+    letter-spacing: 3px; color: var(--cyan); margin-bottom: 5px;
+  }
+  .addcargo-title {
+    font-family: 'Rajdhani', sans-serif; font-size: 20px; font-weight: 700;
+    color: #fff; letter-spacing: 1px; margin-bottom: 4px;
+  }
+  .addcargo-efficiency {
+    font-family: 'Share Tech Mono', monospace; font-size: 11px;
+    color: var(--text3); letter-spacing: 1px; margin-bottom: 10px;
+  }
+  .addcargo-efficiency span { color: var(--orange); }
+  .addcargo-items {
+    background: var(--bg2); border-radius: 5px; padding: 8px 10px;
+    margin-bottom: 6px; display: flex; flex-direction: column; gap: 5px;
+  }
+  .addcargo-item {
+    display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--text);
+  }
+  .addcargo-item-icon { font-size: 16px; flex-shrink: 0; }
+  .addcargo-item-info { flex: 1; }
+  .addcargo-item-value {
+    font-family: 'Share Tech Mono', monospace; font-size: 10px; color: var(--accent);
+  }
+  .addcargo-potential {
+    font-family: 'Share Tech Mono', monospace; font-size: 11px;
+    color: var(--green); letter-spacing: 1px; margin-bottom: 4px;
+  }
+  .addcargo-warning {
+    font-size: 10px; color: var(--text3); margin-bottom: 12px; line-height: 1.5;
+  }
+  .addcargo-warning strong { color: var(--orange); }
+  .addcargo-actions { display: flex; gap: 8px; }
+  .addcargo-btn-decline {
+    flex: 1; background: var(--panel2); border: 1px solid var(--border2);
+    border-radius: 6px; padding: 11px 6px;
+    font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 700;
+    color: var(--text); letter-spacing: 1px; cursor: pointer; transition: all 0.12s; text-align: center;
+  }
+  .addcargo-btn-decline:active { transform: scale(0.97); }
+  .addcargo-btn-accept {
+    flex: 1.2; background: rgba(32,212,224,0.12); border: 1px solid var(--cyan);
+    border-radius: 6px; padding: 11px 6px;
+    font-family: 'Rajdhani', sans-serif; font-size: 13px; font-weight: 700;
+    color: var(--cyan); letter-spacing: 1px; cursor: pointer; transition: all 0.12s;
+    text-align: center; line-height: 1.3;
+  }
+  .addcargo-btn-accept:active { transform: scale(0.97); background: rgba(32,212,224,0.22); }
+
+  .max-load-banner {
+    width: 100%; max-width: 380px;
+    background: linear-gradient(135deg, rgba(32,212,224,0.12), rgba(240,224,64,0.08));
+    border: 1px solid var(--cyan); border-radius: 6px;
+    padding: 10px 14px; margin-bottom: 10px;
+    display: flex; align-items: center; gap: 12px;
+  }
+  .max-load-icon { font-size: 24px; flex-shrink: 0; }
+  .max-load-title {
+    font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 700;
+    color: var(--cyan); letter-spacing: 2px; text-transform: uppercase;
+  }
+  .max-load-sub {
+    font-family: 'Share Tech Mono', monospace; font-size: 10px;
+    color: var(--text2); letter-spacing: 1px; margin-top: 2px;
+  }
+
+  .briefing-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.82);
+    z-index: 260; display: none; align-items: center; justify-content: center;
+    padding: 1.5rem;
+  }
+  .briefing-overlay.show { display: flex; animation: fadeIn 0.25s ease; }
+  .briefing-card {
+    background: var(--panel); border: 1px solid var(--border2);
+    border-radius: 10px; padding: 1.25rem; width: 100%; max-width: 340px;
+  }
+  .briefing-eyebrow {
+    font-family: 'Share Tech Mono', monospace; font-size: 9px;
+    letter-spacing: 4px; color: var(--text3); margin-bottom: 6px;
+  }
+  .briefing-type {
+    font-family: 'Rajdhani', sans-serif; font-size: 22px; font-weight: 700;
+    color: #fff; letter-spacing: 1px; margin-bottom: 2px;
+  }
+  .briefing-type-icon { font-size: 28px; float: right; margin-top: -2px; }
+  .briefing-divider {
+    height: 1px; background: var(--border); margin: 10px 0;
+  }
+  .briefing-lines { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px; }
+  .briefing-line {
+    font-size: 12px; color: var(--text2); display: flex; gap: 8px; align-items: flex-start;
+  }
+  .briefing-line-dot { color: var(--accent); flex-shrink: 0; margin-top: 1px; }
+  .briefing-cutoff-note {
+    font-family: 'Share Tech Mono', monospace; font-size: 10px;
+    color: var(--orange); letter-spacing: 1px; margin-bottom: 12px;
+  }
+  .briefing-btn {
+    width: 100%; background: var(--accent); border: none; border-radius: 6px;
+    padding: 12px; font-family: 'Rajdhani', sans-serif; font-size: 16px;
+    font-weight: 700; color: #000; letter-spacing: 2px; cursor: pointer;
+    transition: all 0.12s;
+  }
+  .briefing-btn:active { transform: scale(0.97); background: var(--accent2); }
+
+  /* ===== GRADE DISPLAY ===== */
+  .grade-block {
+    display: flex; align-items: center; gap: 14px;
+    background: var(--panel); border: 1px solid var(--border2);
+    border-radius: 8px; padding: 12px 14px; margin-bottom: 10px;
+    width: 100%; max-width: 380px;
+  }
+  .grade-letter {
+    font-family: 'Rajdhani', sans-serif; font-size: 52px; font-weight: 700;
+    line-height: 1; min-width: 44px; text-align: center;
+    animation: gradeReveal 0.4s cubic-bezier(0.34,1.56,0.64,1) both;
+  }
+  @keyframes gradeReveal {
+    from { transform: scale(0.3); opacity: 0; }
+    to   { transform: scale(1);   opacity: 1; }
+  }
+  .grade-letter.S { color: #f0e040; text-shadow: 0 0 20px rgba(240,224,64,0.7); }
+  .grade-letter.A { color: var(--cyan); text-shadow: 0 0 16px rgba(32,212,224,0.5); }
+  .grade-letter.B { color: var(--green); text-shadow: 0 0 12px rgba(46,204,113,0.4); }
+  .grade-letter.C { color: var(--accent); text-shadow: 0 0 10px rgba(232,160,32,0.35); }
+  .grade-letter.D { color: var(--orange); }
+  .grade-letter.F { color: var(--red); text-shadow: 0 0 10px rgba(231,76,60,0.4); }
+  .grade-info { flex: 1; }
+  .grade-title {
+    font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 700;
+    color: #fff; letter-spacing: 1px; text-transform: uppercase; margin-bottom: 2px;
+  }
+  .grade-subtitle {
+    font-size: 11px; color: var(--text2); font-style: italic; line-height: 1.4;
+  }
+  .grade-shipment-tag {
+    font-family: 'Share Tech Mono', monospace; font-size: 9px;
+    color: var(--text3); letter-spacing: 2px; margin-top: 4px;
+  }
+
+  /* ===== SCORE SCREEN ===== */
+  #screen-score {
+    align-items: center;
+    justify-content: flex-start;
+    padding: 1.5rem 1.25rem;
+    overflow-y: auto;
+    gap: 0;
+    background: radial-gradient(ellipse at 50% 0%, rgba(232,160,32,0.06) 0%, transparent 60%);
+  }
+
+  .score-header {
+    text-align: center;
+    margin-bottom: 1.5rem;
+    width: 100%;
+  }
+  .score-verdict {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+  }
+  .score-verdict.perfect { color: var(--accent); }
+  .score-verdict.good { color: var(--green); }
+  .score-verdict.ok { color: var(--blue); }
+  .score-verdict.poor { color: var(--red); }
+  .score-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 36px;
+    font-weight: 700;
+    color: #fff;
+    line-height: 1;
+    margin-bottom: 0.25rem;
+  }
+  .score-round-info {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--text2);
+    letter-spacing: 2px;
+  }
+
+  .score-breakdown {
+    width: 100%;
+    max-width: 380px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 1.5rem;
+  }
+  .score-row {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 8px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .score-row-label { font-size: 13px; color: var(--text2); }
+  .score-row-val {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+  }
+  .score-row-val.pos { color: var(--green); }
+  .score-row-val.neg { color: var(--red); }
+  .score-row.total {
+    border-color: var(--accent);
+    background: rgba(232,160,32,0.08);
+  }
+  .score-row.total .score-row-label { font-weight: 700; color: var(--text); font-size: 14px; }
+  .score-row.total .score-row-val { font-size: 18px; color: var(--accent); }
+
+  .score-visual {
+    width: 100%;
+    max-width: 380px;
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 10px;
+    margin-bottom: 1.5rem;
+  }
+  .score-visual-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: var(--text3);
+    margin-bottom: 8px;
+  }
+
+  .score-actions {
+    width: 100%;
+    max-width: 380px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .btn-secondary {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--text);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: all 0.12s;
+    width: 100%;
+    text-align: center;
+  }
+  .btn-secondary:active { transform: scale(0.97); background: var(--bg3); }
+
+  /* ===== CANVAS OVERLAY ===== */
+  .canvas-overlay {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+  }
+
+  /* ===== TOAST ===== */
+  .toast {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.8);
+    background: var(--panel);
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    padding: 12px 24px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    z-index: 200;
+    opacity: 0;
+    transition: all 0.2s;
+    pointer-events: none;
+    text-align: center;
+  }
+  .toast.show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  /* ===== PERFECT LOAD ANIMATION ===== */
+  .perfect-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.8);
+    z-index: 300;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 12px;
+  }
+  .perfect-overlay.show { display: flex; animation: fadeIn 0.3s ease; }
+  .perfect-text {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 52px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 4px;
+    text-shadow: 0 0 40px rgba(232,160,32,0.8);
+    animation: pulse 0.5s ease-in-out infinite alternate;
+  }
+  .perfect-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: var(--accent2);
+    letter-spacing: 3px;
+  }
+  @keyframes pulse { from { transform: scale(1); } to { transform: scale(1.05); } }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+  /* ===== DRAG GHOST ===== */
+  .drag-ghost {
+    position: fixed;
+    pointer-events: none;
+    z-index: 500;
+    border-radius: 6px;
+    transform-origin: top left;
+    will-change: transform;      /* promote to own compositing layer */
+    filter: drop-shadow(0 6px 20px rgba(32,212,224,0.6));
+    transition: none;
+    top: 0; left: 0;             /* positioned via transform: translate() */
+  }
+
+  /* During drag: show return-to-manifest zone */
+  .manifest-panel.drag-over {
+    border-bottom-color: var(--accent);
+    background: rgba(232,160,32,0.06);
+    transition: background 0.1s;
+  }
+  .manifest-drop-hint {
+    display: none;
+    position: absolute;
+    inset: 0;
+    border: 2px dashed var(--accent);
+    border-radius: 4px;
+    pointer-events: none;
+    z-index: 10;
+  }
+  .manifest-panel { position: relative; }
+  .manifest-panel.drag-over .manifest-drop-hint { display: block; }
+
+  /* touch-action: none on the whole game screen prevents scroll/zoom during drag.
+     The manifest scroll tray overrides to pan-x so horizontal scroll still works. */
+  #screen-game { touch-action: none; }
+  .manifest-items { touch-action: pan-x; }
+  .manifest-item { touch-action: none; user-select: none; -webkit-user-select: none; }
+  #container-canvas { touch-action: none; cursor: crosshair; display: block; }
+
+  /* ===== MENU STEP SYSTEM ===== */
+  .menu-step-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 4px;
+    color: var(--text3);
+    text-align: left;
+    margin-bottom: 6px;
+    width: 100%;
+    max-width: 340px;
+  }
+  .loadtype-row {
+    display: flex;
+    gap: 8px;
+    width: 100%;
+    max-width: 340px;
+    margin-bottom: 0.75rem;
+  }
+  .loadtype-btn {
+    flex: 1;
+    background: var(--panel);
+    border: 2px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 10px;
+    cursor: pointer;
+    text-align: center;
+    transition: all 0.15s;
+    touch-action: manipulation;
+  }
+  .loadtype-btn:active { transform: scale(0.97); }
+  .loadtype-btn.selected {
+    border-color: var(--accent);
+    background: rgba(232,160,32,0.10);
+  }
+  .loadtype-btn-badge {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 22px;
+    font-weight: 700;
+    color: #fff;
+    letter-spacing: 2px;
+    display: block;
+    margin-bottom: 3px;
+  }
+  .loadtype-btn.selected .loadtype-btn-badge { color: var(--accent); }
+  .loadtype-btn-name {
+    font-size: 10px;
+    color: var(--text2);
+    letter-spacing: 1px;
+    display: block;
+    margin-bottom: 3px;
+  }
+  .loadtype-btn-desc {
+    font-size: 10px;
+    color: var(--text3);
+    line-height: 1.4;
+  }
+  /* Step 2 panel — initially hidden, slides in */
+  .step2-panel {
+    width: 100%;
+    max-width: 340px;
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 0;
+  }
+  .step2-panel.visible { display: flex; animation: fadeIn 0.2s ease; }
+  ::-webkit-scrollbar { width: 3px; height: 3px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  /* ===== RISK MODAL ===== */
+  .risk-overlay {
+    position: fixed; inset: 0; background: rgba(0,0,0,0.75); z-index: 250;
+    display: none; align-items: center; justify-content: center; padding: 1.5rem;
+  }
+  .risk-overlay.show { display: flex; }
+  .risk-modal {
+    background: var(--panel); border: 1px solid var(--red);
+    border-radius: 10px; padding: 1.25rem; width: 100%; max-width: 340px;
+  }
+  .risk-modal-title {
+    font-family: 'Rajdhani', sans-serif; font-size: 20px; font-weight: 700;
+    color: var(--red); letter-spacing: 2px; margin-bottom: 4px;
+  }
+  .risk-modal-sub {
+    font-family: 'Share Tech Mono', monospace; font-size: 10px;
+    color: var(--text3); letter-spacing: 2px; margin-bottom: 12px;
+  }
+  .risk-issue {
+    background: var(--bg2); border-left: 3px solid var(--orange);
+    border-radius: 3px; padding: 6px 10px; margin-bottom: 6px;
+    font-size: 12px; color: var(--text);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .risk-issue.critical { border-left-color: var(--red); }
+  .risk-issue-icon { font-size: 14px; flex-shrink: 0; }
+  .risk-modal-actions { display: flex; gap: 8px; margin-top: 14px; }
+  .risk-btn-rework {
+    flex: 1; background: var(--panel2); border: 1px solid var(--border2);
+    border-radius: 6px; padding: 11px 8px;
+    font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 700;
+    color: var(--text); letter-spacing: 1px; cursor: pointer; transition: all 0.12s;
+  }
+  .risk-btn-rework:active { transform: scale(0.97); }
+  .risk-btn-ship {
+    flex: 1; background: rgba(231,76,60,0.15); border: 1px solid var(--red);
+    border-radius: 6px; padding: 11px 8px;
+    font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 700;
+    color: var(--red); letter-spacing: 1px; cursor: pointer; transition: all 0.12s;
+  }
+  .risk-btn-ship:active { transform: scale(0.97); background: rgba(231,76,60,0.25); }
+
+  /* ===== OVERBOOKED MODAL ===== */
+  .overbooked-modal {
+    background: var(--panel); border: 1px solid var(--orange);
+    border-radius: 10px; padding: 1.25rem; width: 100%; max-width: 340px;
+  }
+  .overbooked-modal-title {
+    font-family: 'Rajdhani', sans-serif; font-size: 20px; font-weight: 700;
+    color: var(--orange); letter-spacing: 2px; margin-bottom: 4px;
+  }
+  .overbooked-modal-sub {
+    font-family: 'Share Tech Mono', monospace; font-size: 10px;
+    color: var(--text3); letter-spacing: 2px; margin-bottom: 12px;
+  }
+  .overbooked-options {
+    display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px;
+  }
+  .overbooked-option {
+    background: var(--bg2); border-left: 3px solid var(--text3);
+    border-radius: 3px; padding: 6px 10px; font-size: 12px; color: var(--text2);
+    display: flex; align-items: center; gap: 8px;
+  }
+  .overbooked-option-icon { font-size: 14px; flex-shrink: 0; }
+  .overbooked-unloaded {
+    font-family: 'Share Tech Mono', monospace; font-size: 11px;
+    color: var(--orange); margin-bottom: 10px; text-align: center;
+    letter-spacing: 1px;
+  }
+  .overbooked-actions { display: flex; gap: 8px; }
+  .overbooked-btn-rework {
+    flex: 1.2; background: var(--accent); border: none;
+    border-radius: 6px; padding: 11px 8px;
+    font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 700;
+    color: #000; letter-spacing: 1px; cursor: pointer; transition: all 0.12s;
+  }
+  .overbooked-btn-rework:active { transform: scale(0.97); background: var(--accent2); }
+  .overbooked-btn-ship {
+    flex: 1; background: rgba(243,156,18,0.12); border: 1px solid var(--orange);
+    border-radius: 6px; padding: 11px 8px;
+    font-family: 'Rajdhani', sans-serif; font-size: 14px; font-weight: 700;
+    color: var(--orange); letter-spacing: 1px; cursor: pointer; transition: all 0.12s;
+  }
+  .overbooked-btn-ship:active { transform: scale(0.97); background: rgba(243,156,18,0.22); }
+
+  /* Optimal layout reveal on score screen */
+  .optimal-reveal {
+    width: 100%; max-width: 380px;
+    background: var(--panel); border: 1px solid var(--cyan);
+    border-radius: 6px; padding: 10px; margin-bottom: 1.5rem;
+  }
+  .optimal-reveal-title {
+    font-family: 'Share Tech Mono', monospace; font-size: 9px;
+    letter-spacing: 3px; color: var(--cyan); margin-bottom: 4px;
+  }
+  .optimal-reveal-sub {
+    font-size: 11px; color: var(--text2); margin-bottom: 8px;
+  }
+
+  /* Weight class badge on manifest items */
+  .wclass-badge {
+    font-family: 'Share Tech Mono', monospace; font-size: 7px;
+    padding: 1px 3px; border-radius: 2px; margin-top: 1px; display: inline-block;
+    letter-spacing: 0.5px;
+  }
+  .wclass-L { background: rgba(59,158,255,0.2); color: #3b9eff; }
+  .wclass-M { background: rgba(232,160,32,0.2); color: #e8a020; }
+  .wclass-H { background: rgba(231,76,60,0.2); color: #e74c3c; }
+
+  /* Canvas warning pulse animation */
+  @keyframes warnPulse {
+    0%,100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  /* Vessel Cut-Off strip */
+  .cutoff-strip {
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    padding: 5px 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+  }
+  .cutoff-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 3px;
+    color: var(--text3);
+    white-space: nowrap;
+    text-transform: uppercase;
+  }
+  .cutoff-clock {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 2px;
+    min-width: 44px;
+    text-align: right;
+    transition: color 0.4s;
+  }
+  .cutoff-clock.warn  { color: var(--orange); }
+  .cutoff-clock.crit  { color: var(--red); animation: cutoffPulse 0.8s ease-in-out infinite alternate; }
+  @keyframes cutoffPulse { from { opacity: 1; } to { opacity: 0.5; } }
+  .cutoff-bar-track {
+    flex: 1;
+    height: 4px;
+    background: var(--bg);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .cutoff-bar-fill {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 1s linear, background 0.4s;
+  }
+  .cutoff-delay-badge {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    color: var(--red);
+    letter-spacing: 1px;
+    white-space: nowrap;
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .cutoff-delay-badge.show { opacity: 1; }
+
+  /* Vessel Cut-Off modal */
+  .cutoff-modal {
+    background: var(--panel);
+    border: 1px solid var(--orange);
+    border-radius: 10px;
+    padding: 1.25rem;
+    width: 100%;
+    max-width: 340px;
+  }
+  .cutoff-modal-title {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--orange);
+    letter-spacing: 2px;
+    margin-bottom: 2px;
+  }
+  .cutoff-modal-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 2px;
+    margin-bottom: 10px;
+  }
+  .cutoff-modal-info {
+    background: var(--bg2);
+    border-radius: 4px;
+    padding: 8px 10px;
+    margin-bottom: 10px;
+    font-size: 12px;
+    color: var(--text2);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .cutoff-modal-info span { display: flex; justify-content: space-between; }
+  .cutoff-modal-info .val { font-family: 'Share Tech Mono', monospace; color: var(--text); }
+  .cutoff-modal-info .val.red { color: var(--red); }
+  .cutoff-modal-actions { display: flex; gap: 8px; margin-top: 12px; }
+  .cutoff-btn-ship {
+    flex: 1.1;
+    background: var(--accent);
+    border: none;
+    border-radius: 6px;
+    padding: 11px 6px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: #000;
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.12s;
+    text-align: center;
+    line-height: 1.3;
+  }
+  .cutoff-btn-ship:active { transform: scale(0.97); background: var(--accent2); }
+  .cutoff-btn-delay {
+    flex: 1;
+    background: rgba(231,76,60,0.1);
+    border: 1px solid var(--red);
+    border-radius: 6px;
+    padding: 11px 6px;
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--red);
+    letter-spacing: 1px;
+    cursor: pointer;
+    transition: all 0.12s;
+    text-align: center;
+    line-height: 1.3;
+  }
+  .cutoff-btn-delay:active { transform: scale(0.97); background: rgba(231,76,60,0.2); }
+</style>
+</head>
+<body>
+<div class="scanlines"></div>
+
+<!-- TITLE SCREEN -->
+<div id="screen-title" class="screen active">
+  <div class="title-eyebrow">LOGISTICS ARCADE</div>
+  <div class="title-logo">CONTAINER<br><span>STUFFER</span></div>
+  <div class="title-sub">LOAD · STACK · SHIP · SCORE</div>
+
+  <svg class="title-container-art" viewBox="0 0 340 120" xmlns="http://www.w3.org/2000/svg">
+    <rect x="4" y="10" width="332" height="100" rx="4" fill="#1a2030" stroke="#2a3448" stroke-width="1.5"/>
+    <line x1="4" y1="28" x2="336" y2="28" stroke="#2a3448" stroke-width="1"/>
+    <line x1="4" y1="92" x2="336" y2="92" stroke="#2a3448" stroke-width="1"/>
+    <line x1="60" y1="10" x2="60" y2="110" stroke="#232c3a" stroke-width="1"/>
+    <line x1="116" y1="10" x2="116" y2="110" stroke="#232c3a" stroke-width="1"/>
+    <line x1="172" y1="10" x2="172" y2="110" stroke="#232c3a" stroke-width="1"/>
+    <line x1="228" y1="10" x2="228" y2="110" stroke="#232c3a" stroke-width="1"/>
+    <line x1="284" y1="10" x2="284" y2="110" stroke="#232c3a" stroke-width="1"/>
+    <rect x="12" y="36" width="40" height="32" rx="3" fill="#2a3a28" stroke="#3a5a30" stroke-width="1"/>
+    <rect x="12" y="68" width="40" height="22" rx="2" fill="#3a2820" stroke="#5a3818" stroke-width="1"/>
+    <rect x="56" y="36" width="56" height="54" rx="3" fill="#1e2a3a" stroke="#2a3a5a" stroke-width="1"/>
+    <rect x="72" y="44" width="24" height="10" rx="1" fill="#2a3a5a"/>
+    <rect x="72" y="60" width="24" height="10" rx="1" fill="#2a3a5a"/>
+    <circle cx="140" cy="60" r="12" fill="#2a1e30" stroke="#4a2a5a" stroke-width="1"/>
+    <circle cx="164" cy="60" r="12" fill="#2a1e30" stroke="#4a2a5a" stroke-width="1"/>
+    <rect x="178" y="60" width="46" height="30" rx="3" fill="#2a2018" stroke="#5a4020" stroke-width="1"/>
+    <rect x="178" y="36" width="46" height="22" rx="3" fill="#1a2a1a" stroke="#2a4a2a" stroke-width="1"/>
+    <text x="195" y="51" fill="#3a8a3a" font-size="10" font-family="monospace">✦</text>
+    <rect x="230" y="36" width="40" height="54" rx="2" fill="none" stroke="#2a3448" stroke-width="0.5" stroke-dasharray="3 3"/>
+    <text x="246" y="67" fill="#3a4a60" font-size="10" font-family="monospace">?</text>
+    <rect x="318" y="10" width="18" height="100" rx="2" fill="#1e2535" stroke="#3a4a60" stroke-width="1"/>
+    <line x1="327" y1="10" x2="327" y2="110" stroke="#3a4a60" stroke-width="0.5"/>
+    <circle cx="322" cy="60" r="4" fill="#e8a020"/>
+    <circle cx="332" cy="60" r="4" fill="#e8a020"/>
+  </svg>
+
+  <!-- STEP 1: OPERATION MODE -->
+  <div class="menu-step-label">◆ STEP 1 — SELECT OPERATION MODE</div>
+  <div class="diff-grid" id="diff-grid">
+    <div class="diff-btn selected" data-diff="0" onclick="selectDiff(this, 0)">
+      <div class="diff-icon">🏗️</div>
+      <div class="diff-info">
+        <div class="diff-name">Standard Ops</div>
+        <div class="diff-desc">Balanced · no time pressure</div>
+      </div>
+      <div class="diff-stars">★★☆☆☆</div>
+    </div>
+    <div class="diff-btn" data-diff="1" onclick="selectDiff(this, 1)">
+      <div class="diff-icon">🚢</div>
+      <div class="diff-info">
+        <div class="diff-name">Busy Port</div>
+        <div class="diff-desc">Vessel cut-off · tight timing</div>
+      </div>
+      <div class="diff-stars">★★★☆☆</div>
+    </div>
+    <div class="diff-btn" data-diff="2" onclick="selectDiff(this, 2)">
+      <div class="diff-icon">☢️</div>
+      <div class="diff-info">
+        <div class="diff-name">Dangerous Goods</div>
+        <div class="diff-desc">Hazmat · separation rules</div>
+      </div>
+      <div class="diff-stars">★★★★☆</div>
+    </div>
+    <div class="diff-btn" data-diff="3" onclick="selectDiff(this, 3)">
+      <div class="diff-icon">🌀</div>
+      <div class="diff-info">
+        <div class="diff-name">Chaos Shift</div>
+        <div class="diff-desc">Oversized · fast clock</div>
+      </div>
+      <div class="diff-stars">★★★★★</div>
+    </div>
+    <div class="diff-btn" data-diff="4" onclick="selectDiff(this, 4)">
+      <div class="diff-icon">💀</div>
+      <div class="diff-info">
+        <div class="diff-name">Freight Nightmare</div>
+        <div class="diff-desc">Emergency freight · all hazards</div>
+      </div>
+      <div class="diff-stars">★★★★★</div>
+    </div>
+  </div>
+
+  <!-- STEP 2: SHIPMENT TYPE (FCL / LCL) — revealed after mode selected -->
+  <div class="step2-panel visible" id="step2-panel">
+    <div class="menu-step-label">◆ STEP 2 — SELECT SHIPMENT TYPE</div>
+    <div class="loadtype-row">
+      <button class="loadtype-btn selected" id="lt-fcl" onclick="selectLoadType('fcl')">
+        <span class="loadtype-btn-badge">FCL</span>
+        <span class="loadtype-btn-name">Full Container Load</span>
+        <span class="loadtype-btn-desc">Industry-specific cargo.<br>Cleaner. More optimisable.</span>
+      </button>
+      <button class="loadtype-btn" id="lt-lcl" onclick="selectLoadType('lcl')">
+        <span class="loadtype-btn-badge">LCL</span>
+        <span class="loadtype-btn-name">Less than Container Load</span>
+        <span class="loadtype-btn-desc">Mixed consolidated cargo.<br>Awkward. Operationally chaotic.</span>
+      </button>
+    </div>
+  </div>
+
+  <button class="btn-primary" onclick="startGame()">LOAD CARGO</button>
+  <div class="highscore-strip" id="hs-strip">BEST: <span id="hs-val">—</span></div>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="screen-game" class="screen">
+  <div class="hud-top">
+    <button class="hud-menu-btn" onclick="confirmReturnToMenu()" aria-label="Return to menu" title="Return to menu">≡</button>
+    <div class="hud-round" id="hud-round">RND 1</div>
+    <div class="hud-mode" id="hud-mode">STANDARD OPS</div>
+    <div style="display:flex;align-items:center;gap:8px">
+      <div style="font-family:'Share Tech Mono',monospace;font-size:10px;color:var(--text3);letter-spacing:1px" id="hud-rework" title="Rework operations used">↺<span id="hud-rework-val">0</span></div>
+      <div class="hud-score-display">$<span id="hud-score">0</span></div>
+    </div>
+  </div>
+
+<!-- Return to menu confirmation modal -->
+<div class="risk-overlay" id="return-overlay">
+  <div class="return-modal">
+    <div class="return-modal-eyebrow">◆ ABANDON SHIPMENT</div>
+    <div class="return-modal-title">RETURN TO TERMINAL MENU?</div>
+    <div class="return-modal-body">Current shipment progress will be lost.<br>Total session score is preserved.</div>
+    <div class="return-modal-actions">
+      <button class="return-btn-cancel" onclick="cancelReturnToMenu()">← STAY</button>
+      <button class="return-btn-confirm" onclick="executeReturnToMenu()">RETURN TO MENU</button>
+    </div>
+  </div>
+</div>
+  <!-- Vessel Cut-Off strip (hidden when no cutoff applies) -->
+  <div class="cutoff-strip" id="cutoff-strip" style="display:none">
+    <div class="cutoff-label">VESSEL CUT-OFF</div>
+    <div class="cutoff-clock" id="cutoff-clock">--:--</div>
+    <div class="cutoff-bar-track">
+      <div class="cutoff-bar-fill" id="cutoff-bar" style="width:100%;background:var(--accent)"></div>
+    </div>
+    <div class="cutoff-delay-badge" id="cutoff-delay-badge">DELAYED</div>
+  </div>
+  <div class="manifest-panel" id="manifest-panel">
+    <div class="manifest-drop-hint" id="manifest-drop-hint"></div>
+    <div class="manifest-header">◆ CARGO MANIFEST</div>
+    <div class="manifest-scroll-row">
+      <button class="manifest-arrow hidden" id="manifest-arrow-left"
+              onclick="scrollManifest(-1)" aria-label="Scroll manifest left">‹</button>
+      <div class="manifest-items" id="manifest-items"></div>
+      <button class="manifest-arrow hidden" id="manifest-arrow-right"
+              onclick="scrollManifest(1)" aria-label="Scroll manifest right">›</button>
+    </div>
+  </div>
+  <div class="play-area">
+    <div class="container-wrapper">
+      <div class="container-label" id="container-label">SELECT CARGO FROM MANIFEST · TAP TO PLACE</div>
+      <div class="container-outer" id="container-outer">
+        <canvas id="container-canvas"></canvas>
+      </div>
+    </div>
+    <div class="side-panel">
+      <div class="side-panel-title">◆ LOAD STATUS</div>
+      <div class="stability-bars">
+        <div class="stab-bar-row">
+          <div class="stab-bar-label">Space Used</div>
+          <div class="stab-bar-track"><div class="stab-bar-fill" id="bar-space" style="width:0%;background:var(--green)"></div></div>
+        </div>
+        <div class="stab-bar-row">
+          <div class="stab-bar-label">Crush Risk</div>
+          <div class="stab-bar-track"><div class="stab-bar-fill" id="bar-crush" style="width:0%;background:var(--green)"></div></div>
+        </div>
+        <div class="stab-bar-row">
+          <div class="stab-bar-label">Balance</div>
+          <div class="stab-bar-track"><div class="stab-bar-fill" id="bar-balance" style="width:50%;background:var(--green)"></div></div>
+        </div>
+        <div class="stab-bar-row">
+          <div class="stab-bar-label">Stability</div>
+          <div class="stab-bar-track"><div class="stab-bar-fill" id="bar-stability" style="width:0%;background:var(--green)"></div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="controls-bar">
+    <button class="ctrl-btn rotate-btn" onclick="rotateSelected()">
+      <div class="ctrl-icon">⟳</div>ROTATE
+    </button>
+    <button class="ctrl-btn cancel-btn" id="cancel-btn" onclick="cancelSelection()">
+      <div class="ctrl-icon">✕</div>CANCEL
+    </button>
+    <button class="ctrl-btn unload-btn" id="unload-btn" onclick="unloadSelected()">
+      <div class="ctrl-icon">⬆</div>UNLOAD
+    </button>
+    <button class="ctrl-btn reset-btn" onclick="clearContainer()">
+      <div class="ctrl-icon">↺</div>RESET
+    </button>
+    <button class="ctrl-btn ship-btn" onclick="shipLoad()">
+      <div class="ctrl-icon">🚢</div>SHIP IT
+    </button>
+  </div>
+</div>
+
+<!-- Additional Cargo Modal -->
+<div class="risk-overlay" id="addcargo-overlay">
+  <div class="addcargo-modal">
+    <div class="addcargo-eyebrow">◆ UNUSED CAPACITY DETECTED</div>
+    <div class="addcargo-title">ADDITIONAL CARGO AVAILABLE</div>
+    <div class="addcargo-efficiency" id="addcargo-efficiency">Load Efficiency: <span id="addcargo-pct">—</span></div>
+    <div class="addcargo-items" id="addcargo-items"></div>
+    <div class="addcargo-potential" id="addcargo-potential">Potential Additional Revenue: —</div>
+    <div class="addcargo-warning"><strong>Warning:</strong> Accepting cargo is a commercial commitment. Rejected items incur terminal rehandling costs.</div>
+    <div class="addcargo-actions">
+      <button class="addcargo-btn-decline" onclick="declineAdditionalCargo()">FINALISE SHIPMENT</button>
+      <button class="addcargo-btn-accept" onclick="acceptAdditionalCargo()">LOAD ADDITIONAL<br>CARGO →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Briefing Modal -->
+<div class="briefing-overlay" id="briefing-overlay">
+  <div class="briefing-card">
+    <div class="briefing-eyebrow" id="briefing-eyebrow">◆ INCOMING SHIPMENT</div>
+    <div class="briefing-type" id="briefing-type-name">
+      <span id="briefing-type-icon" class="briefing-type-icon">📦</span>
+      <span id="briefing-type-text">RETAIL CONTAINER</span>
+    </div>
+    <div class="briefing-divider"></div>
+    <div class="briefing-lines" id="briefing-lines"></div>
+    <div class="briefing-cutoff-note" id="briefing-cutoff-note" style="display:none"></div>
+    <button class="briefing-btn" onclick="dismissBriefing()">BEGIN LOADING ›</button>
+  </div>
+</div>
+
+<!-- SCORE SCREEN -->
+<div id="screen-score" class="screen">
+  <div class="score-header" style="width:100%;max-width:380px;margin-bottom:0.75rem">
+    <div class="grade-block" id="grade-block">
+      <div class="grade-letter A" id="grade-letter">A</div>
+      <div class="grade-info">
+        <div class="grade-title" id="grade-title">EFFICIENT OPERATION</div>
+        <div class="grade-subtitle" id="grade-subtitle">Container secured without incident.</div>
+        <div class="grade-shipment-tag" id="grade-shipment-tag">◆ RETAIL CONTAINER</div>
+      </div>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:0 2px;margin-top:8px">
+      <div class="score-round-info" id="score-round-info">ROUND 1 · STANDARD OPS</div>
+      <div class="score-title" style="font-size:24px">$<span id="score-net">0</span></div>
+    </div>
+  </div>
+  <div class="score-breakdown" id="score-breakdown"></div>
+  <div class="max-load-banner" id="max-load-banner" style="display:none">
+    <div class="max-load-icon">⚡</div>
+    <div>
+      <div class="max-load-title">FULL UTILISATION ACHIEVED</div>
+      <div class="max-load-sub" id="max-load-sub">Terminal capacity optimised.</div>
+    </div>
+  </div>
+  <div class="score-visual">
+    <div class="score-visual-title">◆ CONTAINER SNAPSHOT</div>
+    <canvas id="score-canvas" style="width:100%;border-radius:3px"></canvas>
+  </div>
+  <div class="optimal-reveal" id="optimal-reveal" style="display:none">
+    <div class="optimal-reveal-title">◆ ALTERNATIVE LOADING PLAN IDENTIFIED</div>
+    <div class="optimal-reveal-sub" id="optimal-reveal-sub">All cargo could have fit with a different approach.</div>
+    <canvas id="optimal-canvas" style="width:100%;border-radius:3px"></canvas>
+  </div>
+  <div class="score-actions">
+    <button class="btn-primary" onclick="nextRound()">NEXT SHIPMENT ›</button>
+    <button class="btn-secondary" onclick="goTitle()">← BACK TO PORT</button>
+  </div>
+</div>
+
+<!-- Overbooked Modal -->
+<div class="risk-overlay" id="overbooked-overlay">
+  <div class="overbooked-modal">
+    <div class="overbooked-modal-title">📦 CARGO REMAINING</div>
+    <div class="overbooked-modal-sub">NOT ALL CARGO IS LOADED</div>
+    <div class="overbooked-unloaded" id="overbooked-unloaded-text">3 items left · $4,200 at risk</div>
+    <div class="overbooked-options">
+      <div class="overbooked-option"><span class="overbooked-option-icon">🤔</span><span>This shipment may be overbooked</span></div>
+      <div class="overbooked-option"><span class="overbooked-option-icon">♟</span><span>A different loading plan might fit everything</span></div>
+    </div>
+    <div class="overbooked-actions">
+      <button class="overbooked-btn-rework" onclick="overbookedRework()">↺ REWORK LOAD</button>
+      <button class="overbooked-btn-ship" onclick="overbookedShip()">SHIP OVERBOOKED →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Risk Modal -->
+<div class="risk-overlay" id="risk-overlay">
+  <div class="risk-modal">
+    <div class="risk-modal-title">⚠ LOAD RISK DETECTED</div>
+    <div class="risk-modal-sub">ISSUES FOUND IN CURRENT LOAD</div>
+    <div id="risk-issues"></div>
+    <div class="risk-modal-actions">
+      <button class="risk-btn-rework" onclick="reworkLoad()">↺ REWORK LOAD</button>
+      <button class="risk-btn-ship" onclick="shipAnyway()">SHIP ANYWAY →</button>
+    </div>
+  </div>
+</div>
+
+<!-- Drag ghost -->
+<canvas id="drag-ghost" class="drag-ghost" style="display:none"></canvas>
+
+<!-- Vessel Cut-Off Modal -->
+<div class="risk-overlay" id="cutoff-overlay">
+  <div class="cutoff-modal">
+    <div class="cutoff-modal-title">⚓ VESSEL CUT-OFF REACHED</div>
+    <div class="cutoff-modal-sub">LOADING WINDOW EXPIRED</div>
+    <div class="cutoff-modal-info" id="cutoff-modal-info">
+      <span><span>Cargo remaining</span><span class="val" id="cutoff-remaining-label">—</span></span>
+      <span><span>Revenue at risk</span><span class="val red" id="cutoff-revenue-label">—</span></span>
+      <span><span>Delay cost</span><span class="val red" id="cutoff-delay-cost-label">—</span></span>
+    </div>
+    <div class="cutoff-modal-actions">
+      <button class="cutoff-btn-ship" onclick="cutoffShipNow()">
+        🚢 SHIP<br>CURRENT LOAD
+      </button>
+      <button class="cutoff-btn-delay" id="cutoff-delay-btn" onclick="delayVessel()">
+        ⏱ DELAY<br>VESSEL
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Perfect overlay -->
+<div class="perfect-overlay" id="perfect-overlay">
+  <div class="perfect-text">PERFECT LOAD</div>
+  <div class="perfect-sub">ALL CARGO · ZERO DAMAGE · FULL EFFICIENCY</div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ================================================================
+// GAME DATA
+// ================================================================
+
+// weightClass: 'L'=light, 'M'=medium, 'H'=heavy
+// prefersFloor: true = wants to be on bottom row
+// prefersTop: true = wants to be near top (row 0)
+// supportMin: 0.0–1.0 = fraction of base width that must be supported (default 0.7)
+// dgClass: null = normal cargo | 'flammable' | 'corrosive' | 'oxidiser'
+// DG cargo with incompatible dgClass neighbours gets a separation penalty.
+const CARGO_TYPES = [
+  { id:'pallet',    label:'Pallet',    icon:'📦', w:2, h:2, weight:3,  value:800,  color:'#4a7a3a', stroke:'#6aaa4a', fragile:false, rollable:false, heavy:false, hazmat:false, dgClass:null,        weightClass:'M', prefersFloor:false, prefersTop:false, supportMin:0.7 },
+  { id:'crate',     label:'Crate',     icon:'🗃️', w:3, h:2, weight:4,  value:1200, color:'#6a5020', stroke:'#9a7830', fragile:false, rollable:false, heavy:false, hazmat:false, dgClass:null,        weightClass:'M', prefersFloor:false, prefersTop:false, supportMin:0.7 },
+  { id:'barrel',    label:'Drum',      icon:'🛢️', w:1, h:2, weight:2,  value:600,  color:'#3a3a5a', stroke:'#5a5a9a', fragile:false, rollable:true,  heavy:false, hazmat:false, dgClass:null,        weightClass:'M', prefersFloor:true,  prefersTop:false, supportMin:1.0 },
+  { id:'pipe',      label:'Pipe',      icon:'⬜', w:4, h:1, weight:5,  value:1400, color:'#5a4a2a', stroke:'#8a7040', fragile:false, rollable:true,  heavy:false, hazmat:false, dgClass:null,        weightClass:'M', prefersFloor:false, prefersTop:false, supportMin:0.7 },
+  { id:'fragile',   label:'Fragile',   icon:'🔮', w:2, h:2, weight:1,  value:2000, color:'#3a2a5a', stroke:'#7a5aaa', fragile:true,  rollable:false, heavy:false, hazmat:false, dgClass:null,        weightClass:'L', prefersFloor:false, prefersTop:true,  supportMin:0.5 },
+  { id:'machinery', label:'Machinery', icon:'⚙️', w:3, h:3, weight:8,  value:3500, color:'#3a2a1a', stroke:'#6a4a2a', fragile:false, rollable:false, heavy:true,  hazmat:false, dgClass:null,        weightClass:'H', prefersFloor:true,  prefersTop:false, supportMin:0.8 },
+  { id:'hazmat',    label:'Hazmat',    icon:'☢️', w:2, h:2, weight:3,  value:2500, color:'#4a3a0a', stroke:'#9a7a10', fragile:false, rollable:false, heavy:false, hazmat:true,  dgClass:'oxidiser',  weightClass:'M', prefersFloor:false, prefersTop:false, supportMin:0.7 },
+  { id:'bigbox',    label:'Big Box',   icon:'📫', w:4, h:3, weight:6,  value:2800, color:'#1a3a4a', stroke:'#2a6a7a', fragile:false, rollable:false, heavy:true,  hazmat:false, dgClass:null,        weightClass:'H', prefersFloor:true,  prefersTop:false, supportMin:0.8 },
+  { id:'smallbox',  label:'Box',       icon:'📫', w:1, h:1, weight:1,  value:400,  color:'#2a4a2a', stroke:'#4a7a4a', fragile:false, rollable:false, heavy:false, hazmat:false, dgClass:null,        weightClass:'L', prefersFloor:false, prefersTop:false, supportMin:0.5 },
+  { id:'oversized', label:'Oversized', icon:'🏗️', w:5, h:2, weight:10, value:4000, color:'#3a1a1a', stroke:'#7a2a2a', fragile:false, rollable:false, heavy:true,  hazmat:false, dgClass:null,        weightClass:'H', prefersFloor:true,  prefersTop:false, supportMin:0.8 },
+  // ── DG cargo types ──────────────────────────────────────────────────────────
+  { id:'flammable', label:'Flammable', icon:'🔥', w:2, h:2, weight:2,  value:2200, color:'#4a1a08', stroke:'#c04010', fragile:false, rollable:false, heavy:false, hazmat:true,  dgClass:'flammable', weightClass:'M', prefersFloor:false, prefersTop:false, supportMin:0.7 },
+  { id:'corrosive', label:'Corrosive', icon:'⚗️', w:2, h:2, weight:2,  value:2000, color:'#0a3a10', stroke:'#10aa30', fragile:false, rollable:false, heavy:false, hazmat:true,  dgClass:'corrosive', weightClass:'M', prefersFloor:false, prefersTop:false, supportMin:0.7 },
+];
+
+// DG incompatibility pairs — if both appear adjacent, a separation risk fires.
+// Format: Set of "classA|classB" strings (always sorted alphabetically).
+const DG_INCOMPATIBLE = new Set([
+  'flammable|oxidiser',   // Flammable next to Oxidiser = fire risk
+  'corrosive|flammable',  // Corrosive next to Flammable = reactive risk
+  'corrosive|oxidiser',   // Corrosive next to Oxidiser = reactive risk
+]);
+
+function dgPair(a, b) {
+  return [a, b].sort().join('|');
+}
+
+const DIFFICULTY_CONFIGS = [
+  { name:'Standard Ops',     cols:12, rows:5, cutoffTime:0,   delayCost:0,    fragile:0.1, hazmat:0,   oversized:0.1, heavy:0.2, dg:0    },
+  { name:'Busy Port',        cols:12, rows:5, cutoffTime:180, delayCost:2000, fragile:0.2, hazmat:0,   oversized:0.2, heavy:0.3, dg:0    },
+  { name:'Dangerous Goods',  cols:12, rows:5, cutoffTime:0,   delayCost:0,    fragile:0.3, hazmat:0.3, oversized:0.2, heavy:0.3, dg:0.7  },
+  { name:'Chaos Shift',      cols:14, rows:5, cutoffTime:150, delayCost:3000, fragile:0.2, hazmat:0.2, oversized:0.3, heavy:0.4, dg:0.45 },
+  { name:'Freight Nightmare',cols:14, rows:6, cutoffTime:120, delayCost:5000, fragile:0.4, hazmat:0.4, oversized:0.4, heavy:0.5, dg:0.6  },
+];
+
+// ================================================================
+// SHIPMENT TYPES
+// ================================================================
+
+const SHIPMENT_TYPES = [
+  {
+    id: 'retail',
+    // FCL: industry-specific customer container
+    fclName:  'FCL Retail Container',
+    fclIcon:  '🛒',
+    fclLines: [
+      'Dedicated retail customer container',
+      'Stacking encouraged — optimise every cell',
+      'Efficiency is everything',
+    ],
+    // LCL: mixed consolidation — retail dominates but not exclusively
+    lclName:  'LCL Mixed Consolidation',
+    lclIcon:  '📦',
+    lclLines: [
+      'Mixed freight consolidation — retail dominant',
+      'Multiple consignees, varied cargo profiles',
+      'Dense packing required',
+    ],
+    cutoffNote: null,
+    poolFilter:   (ct) => !['pipe','barrel','machinery','bigbox','oversized',
+                             'hazmat','flammable','corrosive'].includes(ct.id) && !ct.heavy,
+    poolBoost:    (ct) => ['fragile'].includes(ct.id),
+    poolPrimary:  (ct) => ['pallet','crate','smallbox'].includes(ct.id),
+    balanceOverride: { floorPct: 0.40, maxHeavy: 0, minSupportRatio: 0.55 },
+  },
+  {
+    id: 'offshore',
+    fclName:  'FCL Offshore Supply',
+    fclIcon:  '⚓',
+    fclLines: [
+      'Dedicated offshore equipment container',
+      'Drums, pipes, and machinery expected',
+      'Fragile instrumentation also aboard',
+    ],
+    lclName:  'LCL Terminal Consolidation',
+    lclIcon:  '🚢',
+    lclLines: [
+      'Multi-customer terminal consolidation',
+      'Awkward mixed cargo profiles',
+      'Operationally unpredictable — adapt accordingly',
+    ],
+    cutoffNote: '⚓ Offshore vessel window is tight.',
+    poolFilter:   (ct) => !['smallbox','flammable','corrosive'].includes(ct.id),
+    poolBoost:    (ct) => ['hazmat','crate','bigbox'].includes(ct.id),
+    poolPrimary:  (ct) => ['barrel','pipe','machinery','fragile'].includes(ct.id),
+    balanceOverride: null,
+  },
+  {
+    id: 'dangerous',
+    fclName:  'FCL Chemical Shipment',
+    fclIcon:  '☢️',
+    fclLines: [
+      'Dedicated hazardous materials container',
+      'DG separation rules strictly apply',
+      'Instability will be penalised',
+    ],
+    lclName:  'LCL Hazardous Consolidation',
+    lclIcon:  '⚠️',
+    lclLines: [
+      'Consolidated DG and mixed freight',
+      'Hazardous cargo requires careful separation',
+      'Mixed restrictions — plan accordingly',
+    ],
+    cutoffNote: null,
+    poolFilter:   (ct) => !['smallbox','machinery','bigbox','oversized','pipe'].includes(ct.id),
+    poolBoost:    (ct) => ['crate','fragile'].includes(ct.id),
+    poolPrimary:  (ct) => ['barrel','hazmat','flammable','corrosive'].includes(ct.id),
+    balanceOverride: { minSupportRatio: 0.22, maxHeavy: 1 },
+  },
+  {
+    id: 'heavy',
+    fclName:  'FCL Industrial Load',
+    fclIcon:  '⚙️',
+    fclLines: [
+      'Dedicated industrial equipment container',
+      'Floor loading strongly recommended',
+      'Balance and crush management critical',
+    ],
+    lclName:  'LCL Industrial Consolidation',
+    lclIcon:  '🔩',
+    lclLines: [
+      'Mixed industrial components consolidation',
+      'Heavy and light cargo combined',
+      'Sequencing and balance management required',
+    ],
+    cutoffNote: null,
+    poolFilter:   (ct) => !['fragile','hazmat','flammable','corrosive','smallbox'].includes(ct.id),
+    poolBoost:    (ct) => ['pipe','pallet'].includes(ct.id),
+    poolPrimary:  (ct) => ['machinery','bigbox','oversized','crate'].includes(ct.id),
+    balanceOverride: { maxHeavy: 4, floorPct: 0.72, minSupportRatio: 0.20 },
+  },
+  {
+    id: 'relief',
+    fclName:  'FCL Emergency Relief',
+    fclIcon:  '🚨',
+    fclLines: [
+      'Dedicated emergency relief container',
+      'Fragile medical supplies — handle with care',
+      'Every item matters — nothing left behind',
+    ],
+    lclName:  'LCL Emergency Consolidation',
+    lclIcon:  '🏥',
+    lclLines: [
+      'Emergency consolidated relief shipment',
+      'Mixed urgent cargo — multiple origins',
+      'Critical cut-off — prioritise loading speed',
+    ],
+    cutoffNote: '🚨 Emergency vessel — cut-off strictly enforced.',
+    poolFilter:   (ct) => !['machinery','bigbox','oversized','pipe',
+                             'hazmat','flammable','corrosive','barrel'].includes(ct.id),
+    poolBoost:    (ct) => ['crate'].includes(ct.id),
+    poolPrimary:  (ct) => ['fragile','smallbox','pallet'].includes(ct.id),
+    balanceOverride: { minSupportRatio: 0.42, maxHeavy: 0, maxDrums: 0 },
+  },
+];
+
+// Returns the correct name/icon/lines for the current FCL or LCL selection.
+// Single source of truth for all display locations.
+function getShipmentIdentity() {
+  const st   = state.shipmentType;
+  const isFCL = (state.loadType || 'fcl') === 'fcl';
+  if (!st) return { name: 'SHIPMENT', icon: '📦', lines: [], tag: 'SHIPMENT' };
+  return {
+    name:  isFCL ? st.fclName  : st.lclName,
+    icon:  isFCL ? st.fclIcon  : st.lclIcon,
+    lines: isFCL ? st.fclLines : st.lclLines,
+    // Short operational tag for HUD / results — e.g. "BUSY PORT · LCL HAZARDOUS CONSOLIDATION"
+    tag:   `${(state.cfg?.name || '').toUpperCase()} · ${isFCL ? 'FCL' : 'LCL'} — ${(isFCL ? st.fclName : st.lclName).toUpperCase()}`,
+  };
+}
+
+// ================================================================
+// GRADE DATA
+// ================================================================
+
+const GRADE_DATA = {
+  S: {
+    title: 'Terminal Legend',
+    subtitles: [
+      'Port operations running suspiciously smoothly.',
+      'Even customs looked impressed.',
+      'The forklift operators applauded. Quietly.',
+      'Terminal management has no notes. None.',
+    ],
+  },
+  A: {
+    title: 'Efficient Operation',
+    subtitles: [
+      'Container secured without incident.',
+      'Minimal complaints received.',
+      'Signed off. No follow-up required.',
+      'Operationally sound. Well done.',
+    ],
+  },
+  B: {
+    title: 'Cleared For Departure',
+    subtitles: [
+      'Operationally acceptable.',
+      'Nobody got shouted at.',
+      'The vessel left on schedule. More or less.',
+      'Documentation filed. Concerns noted but ignored.',
+    ],
+  },
+  C: {
+    title: 'Delayed & Damaged',
+    subtitles: [
+      'Several operational concerns noted.',
+      'Accounting would like a word.',
+      'The load inspector has submitted a report.',
+      'Some of that cargo may need to be resent.',
+    ],
+  },
+  D: {
+    title: 'Customer Complaint Incoming',
+    subtitles: [
+      'The cargo survived. Mostly.',
+      'Terminal management is visibly stressed.',
+      'A strongly worded email has been drafted.',
+      'The claims department has been put on notice.',
+    ],
+  },
+  F: {
+    title: 'Insurance Claim Pending',
+    subtitles: [
+      'Please proceed directly to the incident report.',
+      'The vessel captain has stopped answering calls.',
+      'Structural integrity was treated as a suggestion.',
+      'Several parties are seeking legal counsel.',
+    ],
+  },
+};
+
+function computeGrade(net, spacePct, crushLoss, floatLoss, drumLoss,
+    unloadedCount, delayCost, reworkLoss, dgLoss) {
+  let score = 0;
+  score += Math.min(35, Math.round((net / 8000) * 35));
+  score += Math.round(spacePct * 20);
+  const damageLoss = (crushLoss || 0) + (floatLoss || 0) + (drumLoss || 0) + (dgLoss || 0);
+  score += Math.max(0, 20 - Math.round((damageLoss / 3000) * 20));
+  score += unloadedCount === 0 ? 15 : Math.max(0, 15 - unloadedCount * 4);
+  score += delayCost === 0 ? 10 : Math.max(0, 10 - Math.round((delayCost / 3000) * 10));
+  score += reworkLoss === 0 ? 2 : Math.max(-3, -Math.round(reworkLoss / 300));
+  if (score >= 90) return 'S';
+  if (score >= 75) return 'A';
+  if (score >= 58) return 'B';
+  if (score >= 42) return 'C';
+  if (score >= 25) return 'D';
+  return 'F';
+}
+
+// ================================================================
+// BRIEFING SYSTEM
+// ================================================================
+
+function showBriefing() {
+  const st = state.shipmentType;
+  if (!st) { return; }
+  const identity = getShipmentIdentity();
+  const ltLabel  = state.loadType === 'fcl' ? 'FCL — FULL CONTAINER LOAD' : 'LCL — CONSOLIDATED SHIPMENT';
+
+  $('briefing-type-icon').textContent = identity.icon;
+  $('briefing-type-text').textContent = identity.name.toUpperCase();
+  if ($('briefing-eyebrow')) $('briefing-eyebrow').textContent = `◆ ${ltLabel}`;
+
+  const linesEl = $('briefing-lines');
+  linesEl.innerHTML = identity.lines.map(l =>
+    `<div class="briefing-line"><span class="briefing-line-dot">›</span><span>${l}</span></div>`
+  ).join('');
+
+  const noteEl = $('briefing-cutoff-note');
+  if (st.cutoffNote && state.cfg.cutoffTime > 0) {
+    noteEl.textContent = st.cutoffNote;
+    noteEl.style.display = 'block';
+  } else {
+    noteEl.style.display = 'none';
+  }
+  $('briefing-overlay').classList.add('show');
+}
+
+function dismissBriefing() {
+  $('briefing-overlay').classList.remove('show');
+  // Start the cut-off timer only after briefing is dismissed
+  if (state.cfg.cutoffTime > 0) {
+    clearInterval(state.timerInterval);
+    state.timerInterval = setInterval(timerTick, 1000);
+  }
+}
+
+// Monotonic uid counter — never resets, avoids any Date.now() collision risk
+let _uidSeq = 0;
+function newUid(prefix) { return `${prefix}_${++_uidSeq}`; }
+
+let state = {
+  diff: 0,
+  round: 0,
+  totalScore: 0,
+  cfg: null,
+  COLS: 10,
+  ROWS: 5,
+  CELL: 28,
+  grid: [],
+  cargo: [],
+  selectedId: null,
+  rotationState: {},
+  placedCargo: new Set(),
+  timer: null,
+  timeLeft: 0,
+  timeTotal: 0,
+  reworkCount: 0,      // how many individual cargo unloads this round
+  reworkPenalty: 0,    // accumulated revenue penalty for reworks
+  optimalLayout: [],   // [{uid, col, row, rot}] — generator's known-feasible solution
+  delayCount: 0,       // how many times vessel was delayed this round
+  delayCostTotal: 0,   // accumulated delay cost this round
+  cutoffReached: false,// true once the cut-off fires (prevents double-trigger)
+  shipmentType: null,  // current SHIPMENT_TYPES entry
+  loadType: 'fcl',     // 'fcl' or 'lcl'
+  additionalCargoOffered:   false, // true once the extra-cargo prompt has fired this round
+  additionalCargoAccepted:  false, // true if player accepted the extra cargo offer
+  additionalCargoRejectionPenalty: 0, // penalty if accepted extra cargo left behind
+};
+
+// ================================================================
+// CARGO ACCOUNTING — ground-truth reconciliation
+// ================================================================
+
+// Rebuilds placedCargo from the grid, eliminating any drift between
+// the Set and what is physically present in the container.
+// Called before any shipment logic so counts are always authoritative.
+function reconcilePlacedCargo() {
+  const validUids = new Set(state.cargo.map(c => c.uid));
+  const inGrid    = new Set();
+  for (let r = 0; r < state.ROWS; r++)
+    for (let c = 0; c < state.COLS; c++)
+      if (state.grid[r][c] && validUids.has(state.grid[r][c]))
+        inGrid.add(state.grid[r][c]);
+  state.placedCargo = inGrid;
+}
+
+// ================================================================
+// CARGO VALIDATION ENGINE
+// ================================================================
+
+// Returns per-cargo issues: { uid -> { unsupported, crushed, unstableDrum, topHeavy, supportPct } }
+function analyseLoad() {
+  const issues = {};
+  state.cargo.forEach(cargo => {
+    if (!state.placedCargo.has(cargo.uid)) return;
+    issues[cargo.uid] = { unsupported:false, crushed:false, unstableDrum:false, topHeavy:false, supportPct:1, dgConflict:false };
+  });
+
+  state.cargo.forEach(cargo => {
+    if (!state.placedCargo.has(cargo.uid)) return;
+    const rot = state.rotationState[cargo.uid] || 0;
+    const cw = rot ? cargo.h : cargo.w;
+    const ch = rot ? cargo.w : cargo.h;
+    let topRow = state.ROWS, leftCol = state.COLS;
+    // Find top-left of this cargo in grid
+    outer:for (let r = 0; r < state.ROWS; r++) {
+      for (let c = 0; c < state.COLS; c++) {
+        if (state.grid[r][c] === cargo.uid) { topRow = r; leftCol = c; break outer; }
+      }
+    }
+    const bottomRow = topRow + ch; // row below cargo bottom
+
+    // ── SUPPORT CHECK ──────────────────────────────────────────
+    // Cargo on floor (bottomRow === ROWS) → fully supported
+    if (bottomRow >= state.ROWS) {
+      issues[cargo.uid].supportPct = 1;
+    } else {
+      // Count how many cells of the bottom edge are supported
+      let supported = 0;
+      for (let c = leftCol; c < leftCol + cw; c++) {
+        if (c >= 0 && c < state.COLS && state.grid[bottomRow] && state.grid[bottomRow][c] && state.grid[bottomRow][c] !== cargo.uid) {
+          supported++;
+        }
+      }
+      const supportPct = supported / cw;
+      issues[cargo.uid].supportPct = supportPct;
+      const minSupport = cargo.supportMin || 0.7;
+      if (supportPct < minSupport) {
+        issues[cargo.uid].unsupported = true;
+      }
+    }
+
+    // ── CRUSH CHECK ────────────────────────────────────────────
+    // Fragile cargo: anything MEDIUM or HEAVY above it = crushed
+    if (cargo.fragile) {
+      for (let c = leftCol; c < leftCol + cw; c++) {
+        for (let ar = 0; ar < topRow; ar++) {
+          const aboveUid = state.grid[ar] && state.grid[ar][c];
+          if (aboveUid && aboveUid !== cargo.uid) {
+            const above = state.cargo.find(x => x.uid === aboveUid);
+            if (above && (above.weightClass === 'M' || above.weightClass === 'H')) {
+              issues[cargo.uid].crushed = true;
+            }
+          }
+        }
+      }
+    }
+
+    // ── DRUM STABILITY ─────────────────────────────────────────
+    // Drums prefer floor. If elevated AND support < 100% = unstable
+    if (cargo.rollable && cargo.id === 'barrel') {
+      const onFloor = (bottomRow >= state.ROWS);
+      if (!onFloor && issues[cargo.uid].supportPct < 1) {
+        issues[cargo.uid].unstableDrum = true;
+      }
+      // Also unstable if elevated by more than 1 row
+      if (topRow < state.ROWS - ch - 1) {
+        issues[cargo.uid].unstableDrum = true;
+      }
+    }
+
+    // ── MACHINERY CRUSH-BELOW ──────────────────────────────────
+    // Heavy cargo: flag anything fragile below it
+    if (cargo.weightClass === 'H') {
+      for (let c = leftCol; c < leftCol + cw; c++) {
+        for (let br = topRow + ch; br < state.ROWS; br++) {
+          const belowUid = state.grid[br] && state.grid[br][c];
+          if (belowUid && belowUid !== cargo.uid) {
+            const below = state.cargo.find(x => x.uid === belowUid);
+            if (below && below.fragile && issues[below.uid]) {
+              issues[below.uid].crushed = true;
+            }
+          }
+        }
+      }
+    }
+
+    // ── DG SEPARATION CHECK ────────────────────────────────────────
+    // Flag any placed DG cargo that is orthogonally adjacent to an incompatible DG type.
+    // Each cell of both items is checked so even large pieces trigger correctly.
+    if (cargo.dgClass) {
+      const directions = [{dc:-1,dr:0},{dc:1,dr:0},{dc:0,dr:-1},{dc:0,dr:1}];
+      outer_dg:
+      for (let c = leftCol; c < leftCol + cw; c++) {
+        for (let r = topRow; r < topRow + ch; r++) {
+          for (const {dc, dr} of directions) {
+            const nc = c + dc, nr = r + dr;
+            if (nc < 0 || nc >= state.COLS || nr < 0 || nr >= state.ROWS) continue;
+            const nUid = state.grid[nr]?.[nc];
+            if (!nUid || nUid === cargo.uid) continue;
+            const nb = state.cargo.find(x => x.uid === nUid);
+            if (!nb?.dgClass || nb.dgClass === cargo.dgClass) continue;
+            if (DG_INCOMPATIBLE.has(dgPair(cargo.dgClass, nb.dgClass))) {
+              issues[cargo.uid].dgConflict = true;
+              if (issues[nb.uid]) issues[nb.uid].dgConflict = true;
+            }
+          }
+        }
+      }
+    }
+  });
+
+  return issues;
+}
+
+// Returns array of human-readable issue strings for the risk modal
+function buildRiskReport(issueMap) {
+  const problems = [];
+  let floatingCount = 0, crushedCount = 0, drumCount = 0, dgCount = 0;
+  Object.entries(issueMap).forEach(([uid, iss]) => {
+    const cargo = state.cargo.find(c => c.uid === uid);
+    if (!cargo) return;
+    if (iss.unsupported) floatingCount++;
+    if (iss.crushed) crushedCount++;
+    if (iss.unstableDrum) drumCount++;
+    if (iss.dgConflict) dgCount++;
+  });
+  if (floatingCount > 0) problems.push({ text: `${floatingCount} cargo item${floatingCount>1?'s':''} unsupported / floating`, icon:'🟥', critical: true });
+  if (crushedCount > 0) problems.push({ text: `${crushedCount} fragile item${crushedCount>1?'s':''} at crush risk`, icon:'💥', critical: true });
+  if (drumCount > 0) problems.push({ text: `${drumCount} drum${drumCount>1?'s':''} unstable — may roll`, icon:'⚠️', critical: false });
+  if (dgCount > 0) problems.push({ text: `DG separation risk — incompatible cargo too close`, icon:'🔶', critical: false });
+  return problems;
+}
+
+function $(id) { return document.getElementById(id); }
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  $(id).classList.add('active');
+}
+
+function showToast(msg, duration=1200) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), duration);
+}
+
+function playSound(type) {
+  try {
+    const ctx = new (window.AudioContext || window.webkitAudioContext)();
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    if (type === 'place') {
+      osc.frequency.setValueAtTime(220, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(180, ctx.currentTime + 0.08);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+    } else if (type === 'rotate') {
+      osc.frequency.setValueAtTime(440, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(600, ctx.currentTime + 0.06);
+      gain.gain.setValueAtTime(0.05, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+    } else if (type === 'ship') {
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(80, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.4);
+      gain.gain.setValueAtTime(0.12, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.5);
+    } else if (type === 'score') {
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(523, ctx.currentTime);
+      osc.frequency.setValueAtTime(659, ctx.currentTime + 0.12);
+      osc.frequency.setValueAtTime(784, ctx.currentTime + 0.24);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.4);
+    } else if (type === 'perfect') {
+      osc.type = 'triangle';
+      [523,659,784,1047].forEach((f,i) => {
+        osc.frequency.setValueAtTime(f, ctx.currentTime + i*0.1);
+      });
+      gain.gain.setValueAtTime(0.1, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.6);
+    } else if (type === 'error') {
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(150, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(100, ctx.currentTime + 0.1);
+      gain.gain.setValueAtTime(0.07, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.12);
+    }
+    osc.start(ctx.currentTime);
+    osc.stop(ctx.currentTime + 0.6);
+  } catch(e) {}
+}
+
+// ================================================================
+// DIFFICULTY SELECT
+// ================================================================
+
+function selectDiff(el, idx) {
+  document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('selected'));
+  el.classList.add('selected');
+  state.diff = idx;
+  // Reveal Step 2 (already visible by default but animate in on subsequent picks)
+  $('step2-panel').classList.add('visible');
+}
+
+function selectLoadType(type) {
+  state.loadType = type;
+  $('lt-fcl').classList.toggle('selected', type === 'fcl');
+  $('lt-lcl').classList.toggle('selected', type === 'lcl');
+}
+
+// ================================================================
+// GAME INIT
+// ================================================================
+
+function startGame() {
+  state.round = 0;
+  state.totalScore = 0;
+  state.cfg = DIFFICULTY_CONFIGS[state.diff];
+  // loadType already set by selectLoadType; default fcl if never touched
+  if (!state.loadType) state.loadType = 'fcl';
+  const ltLabel = state.loadType === 'fcl' ? 'FCL' : 'LCL';
+  $('hud-mode').textContent = `${state.cfg.name.toUpperCase()} · ${ltLabel}`;
+  nextRound();
+}
+
+function nextRound() {
+  state.round++;
+  $('hud-round').textContent = 'RND ' + state.round;
+  $('hud-score').textContent = state.totalScore.toLocaleString();
+
+  const cfg = state.cfg;
+  state.COLS = cfg.cols;
+  state.ROWS = cfg.rows;
+
+  // Setup canvas
+  const canvas = $('container-canvas');
+  const outer = $('container-outer');
+  const maxW = Math.min(window.innerWidth - 24, 480);
+  state.CELL = Math.floor((maxW - 20) / cfg.cols);
+  const cw = state.CELL * cfg.cols + 20;
+  const ch = state.CELL * cfg.rows + 20;
+  canvas.width = cw;
+  canvas.height = ch;
+  canvas.style.width = cw + 'px';
+  canvas.style.height = ch + 'px';
+
+  // Init grid
+  state.grid = Array.from({length: cfg.rows}, () => Array(cfg.cols).fill(null));
+  state.placedCargo = new Set();
+  state.selectedId = null;
+  state.rotationState = {};
+  state.reworkCount = 0;
+  state.reworkPenalty = 0;
+  state.optimalLayout = [];
+  state.delayCount = 0;
+  state.delayCostTotal = 0;
+  state.cutoffReached = false;
+  state.additionalCargoOffered  = false;
+  state.additionalCargoAccepted = false;
+  state.additionalCargoRejectionPenalty = 0;
+  // Shipment type is determined by difficulty — index-matched so the label,
+  // briefing, and cargo generation all refer to the same operational context.
+  state.shipmentType = SHIPMENT_TYPES[state.diff] || SHIPMENT_TYPES[0];
+  $('hud-rework-val').textContent = '0';
+
+  // Generate cargo manifest (uses state.shipmentType for pool shaping)
+  generateCargo();
+
+  // Vessel Cut-Off — set up display but don't start ticking yet (briefing first)
+  clearInterval(state.timerInterval);
+  if (cfg.cutoffTime > 0) {
+    state.timeLeft  = cfg.cutoffTime;
+    state.timeTotal = cfg.cutoffTime;
+    $('cutoff-strip').style.display = 'flex';
+    $('cutoff-delay-badge').classList.remove('show');
+    updateCutoffDisplay();
+    // Timer starts in dismissBriefing()
+  } else {
+    state.timeLeft  = 0;
+    state.timeTotal = 0;
+    $('cutoff-strip').style.display = 'none';
+  }
+
+  showScreen('screen-game');
+  renderManifest();
+  renderContainer();
+  updateStatusBars();
+  updateUnloadButton();
+  updateContainerLabel();
+  setupContainerTouch();
+
+  // Show briefing card — timer starts when player dismisses it
+  showBriefing();
+  return; // skip the old showScreen/render block below
+}
+
+function updateTimerBar() {} // legacy stub — replaced by updateCutoffDisplay
+
+function timerTick() {
+  state.timeLeft--;
+  updateCutoffDisplay();
+  if (state.timeLeft <= 0 && !state.cutoffReached) {
+    clearInterval(state.timerInterval);
+    state.cutoffReached = true;
+    showCutoffModal();
+  }
+}
+
+function updateCutoffDisplay() {
+  const total = state.timeTotal || 1;
+  const left  = Math.max(0, state.timeLeft);
+  const pct   = (left / total) * 100;
+
+  // MM:SS clock
+  const mins = String(Math.floor(left / 60)).padStart(2, '0');
+  const secs = String(left % 60).padStart(2, '0');
+  const clock = $('cutoff-clock');
+  clock.textContent = `${mins}:${secs}`;
+  clock.className = 'cutoff-clock' +
+    (pct <= 20 ? ' crit' : pct <= 40 ? ' warn' : '');
+
+  // Progress bar
+  const bar = $('cutoff-bar');
+  bar.style.width = pct + '%';
+  bar.style.background = pct <= 20 ? 'var(--red)' : pct <= 40 ? 'var(--orange)' : 'var(--accent)';
+}
+
+function showCutoffModal() {
+  fullDragCleanup();
+  reconcilePlacedCargo();
+
+  const unloaded = state.cargo.filter(c => !state.placedCargo.has(c.uid));
+  const atRisk   = unloaded.reduce((s, c) => s + c.value, 0);
+  const cfg      = state.cfg;
+
+  // Delay cost = base + per-item charge for remaining cargo
+  const perItemCharge = Math.round(cfg.delayCost * 0.2);
+  const thisCost = cfg.delayCost + unloaded.length * perItemCharge;
+
+  $('cutoff-remaining-label').textContent =
+    unloaded.length === 0 ? 'None — fully loaded' : `${unloaded.length} item${unloaded.length > 1 ? 's' : ''}`;
+  $('cutoff-revenue-label').textContent =
+    atRisk > 0 ? `-$${atRisk.toLocaleString()}` : '$0 (fully loaded)';
+  $('cutoff-delay-cost-label').textContent = `-$${thisCost.toLocaleString()}`;
+
+  // If all cargo is loaded, relabel the delay button as less tempting
+  const delayBtn = $('cutoff-delay-btn');
+  if (unloaded.length === 0) {
+    delayBtn.innerHTML = '⏱ DELAY<br><small style="font-size:10px">(already full)</small>';
+  } else {
+    delayBtn.innerHTML = '⏱ DELAY<br>VESSEL';
+  }
+
+  $('cutoff-overlay').classList.add('show');
+}
+
+function cutoffShipNow() {
+  $('cutoff-overlay').classList.remove('show');
+  // Proceed through normal ship flow — overbooked/risk modals may still fire
+  shipLoad();
+}
+
+function delayVessel() {
+  $('cutoff-overlay').classList.remove('show');
+
+  const cfg = state.cfg;
+  const unloaded = state.cargo.filter(c => !state.placedCargo.has(c.uid));
+  const perItemCharge = Math.round(cfg.delayCost * 0.2);
+  const thisCost = cfg.delayCost + unloaded.length * perItemCharge;
+
+  state.delayCount++;
+  state.delayCostTotal += thisCost;
+  state.cutoffReached = false;
+
+  // Grant extra loading time — each delay gives less time than the last
+  const extraTime = Math.max(60, Math.round(cfg.cutoffTime * 0.5 / state.delayCount));
+  state.timeLeft  = extraTime;
+  state.timeTotal = Math.max(state.timeTotal, extraTime);
+
+  // Show the delay badge and cost
+  $('cutoff-delay-badge').classList.add('show');
+  updateCutoffDisplay();
+  showToast(`VESSEL DELAYED · -$${thisCost.toLocaleString()}`, 2000);
+
+  // Resume ticking
+  state.timerInterval = setInterval(timerTick, 1000);
+}
+
+// Resume timer helper (used by reworkLoad / overbookedRework)
+function resumeTimerIfActive() {
+  if (state.cfg.cutoffTime > 0 && state.timeLeft > 0 && !state.cutoffReached) {
+    clearInterval(state.timerInterval);
+    state.timerInterval = setInterval(timerTick, 1000);
+  }
+}
+
+function generateCargo() {
+  const cfg   = state.cfg;
+  const COLS  = state.COLS;
+  const ROWS  = state.ROWS;
+  const CAP   = COLS * ROWS;
+  const floorCols = COLS; // usable floor columns
+
+  // Per-difficulty utilisation targets
+  const utilTargets = [0.87, 0.89, 0.91, 0.93, 0.96];
+  const targetUtil  = utilTargets[state.diff] || 0.87;
+  const targetCells = Math.floor(CAP * targetUtil);
+
+  // ─── HELPERS ────────────────────────────────────────────────────
+  function shuffle(arr) {
+    const a = arr.slice();
+    for (let i = a.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [a[i], a[j]] = [a[j], a[i]];
+    }
+    return a;
+  }
+
+  // ─── GREEDY PACKER ──────────────────────────────────────────────
+  // Priority order: prefersFloor items → heavy items → everything else → prefersTop last.
+  // This mirrors the correct human loading sequence and guarantees the packer
+  // never leaves floor-preferring items stranded without floor space.
+  function packOrder(cargoList) {
+    const floor   = cargoList.filter(c =>  c.prefersFloor);
+    const top     = cargoList.filter(c =>  c.prefersTop && !c.prefersFloor);
+    const middle  = cargoList.filter(c => !c.prefersFloor && !c.prefersTop);
+    return [...floor, ...middle, ...top];
+  }
+
+  function greedyPack(cargoList) {
+    const grid   = Array.from({length: ROWS}, () => Array(COLS).fill(null));
+    const placed = [];
+
+    function canFit(col, row, w, h) {
+      if (col < 0 || row < 0 || col + w > COLS || row + h > ROWS) return false;
+      for (let r = row; r < row + h; r++)
+        for (let c = col; c < col + w; c++)
+          if (grid[r][c]) return false;
+      return true;
+    }
+    function commit(uid, col, row, w, h, rot) {
+      for (let r = row; r < row + h; r++)
+        for (let c = col; c < col + w; c++)
+          grid[r][c] = uid;
+      placed.push({ uid, col, row, rot });
+    }
+
+    // For a given piece size w×h, find the best slot.
+    // prefersFloor items: only place on the actual floor row.
+    // prefersTop items: only place in row 0 if possible, else any.
+    // Everything else: lowest (largest row index) free slot.
+    function findSlot(w, h, cargo) {
+      if (cargo.prefersFloor) {
+        // Must land on the container floor
+        const floorRow = ROWS - h;
+        for (let col = 0; col <= COLS - w; col++) {
+          if (canFit(col, floorRow, w, h)) return { col, row: floorRow };
+        }
+        // Fall back: lowest available row (soft rule — still places, just risk penalty)
+        for (let row = ROWS - h; row >= 0; row--) {
+          for (let col = 0; col <= COLS - w; col++) {
+            if (canFit(col, row, w, h)) return { col, row };
+          }
+        }
+        return null;
+      }
+      if (cargo.prefersTop) {
+        // Try to place in top rows first (low row index)
+        for (let row = 0; row <= ROWS - h; row++) {
+          for (let col = 0; col <= COLS - w; col++) {
+            if (canFit(col, row, w, h)) return { col, row };
+          }
+        }
+        return null;
+      }
+      // Default: pack bottom-up (fill from floor upward)
+      for (let row = ROWS - h; row >= 0; row--) {
+        for (let col = 0; col <= COLS - w; col++) {
+          if (canFit(col, row, w, h)) return { col, row };
+        }
+      }
+      return null;
+    }
+
+    let usedCells = 0;
+    const ordered = packOrder(cargoList);
+    for (const cargo of ordered) {
+      // Try normal orientation first, then rotated
+      const variants = [{ w: cargo.w, h: cargo.h, rot: 0 }];
+      if (cargo.w !== cargo.h) variants.push({ w: cargo.h, h: cargo.w, rot: 1 });
+
+      let placed_ = false;
+      for (const v of variants) {
+        const slot = findSlot(v.w, v.h, cargo);
+        if (slot) {
+          commit(cargo.uid, slot.col, slot.row, v.w, v.h, v.rot);
+          usedCells += v.w * v.h;
+          placed_ = true;
+          break;
+        }
+      }
+      if (!placed_) continue; // skip unplaceable items — don't abort
+      if (usedCells >= targetCells) break;
+    }
+    return { placed, usedCells, grid };
+  }
+
+  // ─── DIFFICULTY BALANCE LIMITS ──────────────────────────────────
+  // Per-difficulty caps that prevent floor-conflict manifests.
+  // floorPct: max fraction of floor cells that floor-preferring cargo may claim.
+  // maxDrums: max drums in one shipment.
+  // maxHeavy: max heavy (H-class) items.
+  // minSupportRatio: minimum fraction of items that are stackable support cargo.
+  const balanceLimits = [
+    { floorPct: 0.55, maxDrums: 2, maxHeavy: 2, minSupportRatio: 0.38 }, // Standard Ops
+    { floorPct: 0.65, maxDrums: 3, maxHeavy: 2, minSupportRatio: 0.32 }, // Busy Port
+    { floorPct: 0.65, maxDrums: 4, maxHeavy: 3, minSupportRatio: 0.30 }, // Dangerous Goods
+    { floorPct: 0.70, maxDrums: 4, maxHeavy: 3, minSupportRatio: 0.28 }, // Chaos Shift
+    { floorPct: 0.75, maxDrums: 5, maxHeavy: 4, minSupportRatio: 0.25 }, // Freight Nightmare
+  ];
+  const limits = balanceLimits[state.diff] || balanceLimits[0];
+
+  // Floor capacity = COLS cells in the bottom row only.
+  // A floor-preferring item claims min(w,h) floor columns (its narrower dimension).
+  const floorCapacity     = COLS;
+  const maxFloorFootprint = Math.floor(floorCapacity * limits.floorPct);
+
+  // Support-friendly cargo: stackable, not floor-preferring, not heavy
+  function isSupport(ct) {
+    return !ct.prefersFloor && ct.weightClass !== 'H' && ['pallet','crate','smallbox','pipe'].includes(ct.id);
+  }
+
+  // ─── MANIFEST VALIDATION ────────────────────────────────────────
+  function validateManifest(candidates) {
+    let floorFootprint = 0;
+    let fragileCount   = 0;
+    let heavyCount     = 0;
+    let oversizedCount = 0;
+    let drumCount      = 0;
+    let supportCount   = 0;
+    let totalCells     = 0;
+
+    for (const c of candidates) {
+      if (c.prefersFloor) floorFootprint += Math.min(c.w, c.h);
+      if (c.fragile)       fragileCount++;
+      if (c.weightClass === 'H') heavyCount++;
+      if (c.id === 'oversized')  oversizedCount++;
+      if (c.id === 'barrel')     drumCount++;
+      if (isSupport(c))          supportCount++;
+      totalCells += c.w * c.h;
+    }
+
+    // R1: Floor footprint must not exceed the per-difficulty percentage limit
+    if (floorFootprint > effMaxFloorFP) return false;
+
+    // R2: Combined floor footprint must not be physically impossible
+    if (floorFootprint > floorCapacity * 2) return false;
+
+    // R3: Drum cap
+    if (drumCount > effMaxDrums) return false;
+
+    // R4: Heavy item cap
+    if (heavyCount > effMaxHeavy) return false;
+
+    // R5: Fragile cargo must have non-heavy items available above it
+    const lightMedCount = candidates.filter(c => c.weightClass !== 'H').length;
+    if (fragileCount > 0 && heavyCount >= candidates.length - fragileCount) return false;
+
+    // R6: Not more than one oversized per standard container
+    if (oversizedCount > 1 && COLS <= 12) return false;
+
+    // R7: Total cells must not massively exceed capacity
+    if (totalCells > CAP * 1.15) return false;
+
+    // R8: Minimum support cargo ratio (only enforce once list has ≥ 4 items)
+    if (candidates.length >= 4) {
+      if (supportCount / candidates.length < effMinSupportRatio) return false;
+    }
+
+    return true;
+  }
+
+  // ─── MANIFEST ASSEMBLY ─────────────────────────────────────────
+  const stype    = state.shipmentType;
+  const loadType = state.loadType || 'fcl';
+  const pool = [];
+
+  CARGO_TYPES.forEach(ct => {
+    // Difficulty gates
+    if (ct.id === 'oversized'  && Math.random() > cfg.oversized) return;
+    if (ct.id === 'hazmat'     && Math.random() > cfg.hazmat)    return;
+    if (ct.id === 'flammable'  && Math.random() > (cfg.dg || 0)) return;
+    if (ct.id === 'corrosive'  && Math.random() > (cfg.dg || 0)) return;
+    if (ct.fragile             && Math.random() > cfg.fragile * 3) return;
+    if (ct.heavy               && Math.random() > cfg.heavy   * 2) return;
+    // FCL: apply shipment type pool filter strictly
+    // LCL: apply filter loosely — 30% chance of letting excluded types through
+    if (stype?.poolFilter) {
+      if (!stype.poolFilter(ct)) {
+        if (loadType === 'fcl') return;          // hard exclude on FCL
+        if (Math.random() > 0.30) return;        // 70% still excluded on LCL
+      }
+    }
+    pool.push(ct);
+  });
+  // FCL: aggressive primary (3×) and secondary (2×) boosts — industry-specific load
+  // LCL: softer boosts (2× primary, 1× secondary) — mixed consolidation feel
+  if (stype) {
+    CARGO_TYPES.forEach(ct => {
+      if (!pool.find(p => p.id === ct.id)) return;
+      if (stype.poolPrimary && stype.poolPrimary(ct)) {
+        pool.push(ct);                                   // +1 always
+        if (loadType === 'fcl') pool.push(ct);           // +2 on FCL = 3× total
+      } else if (stype.poolBoost && stype.poolBoost(ct)) {
+        if (loadType === 'fcl') pool.push(ct);           // +1 on FCL = 2× total
+        // LCL: no extra copy — baseline probability only
+      }
+    });
+  }
+
+  // Always include baseline support types
+  ['pallet', 'crate', 'smallbox'].forEach(id => {
+    if (!pool.find(c => c.id === id)) pool.push(CARGO_TYPES.find(c => c.id === id));
+  });
+
+  // Ensure filler exists
+  if (!pool.find(c => !c.prefersFloor && c.weightClass !== 'H' && c.w * c.h <= 4)) {
+    pool.push(CARGO_TYPES.find(c => c.id === 'smallbox'));
+  }
+
+  // Apply shipment-type balance overrides (merge over difficulty limits)
+  const effectiveLimits = stype?.balanceOverride
+    ? { ...limits, ...stype.balanceOverride }
+    : limits;
+  const effMaxFloorFP      = Math.floor(floorCapacity * (effectiveLimits.floorPct ?? limits.floorPct));
+  const effMaxDrums        = effectiveLimits.maxDrums ?? limits.maxDrums;
+  const effMaxHeavy        = effectiveLimits.maxHeavy ?? limits.maxHeavy;
+  const effMinSupportRatio = effectiveLimits.minSupportRatio ?? limits.minSupportRatio;
+
+  let bestCargo = [], bestLayout = [], bestScore = -1;
+  const maxAttempts = 14;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt++) {
+    const shuffledPool = shuffle(pool);
+    const candidates   = [];
+    let cellsBuilding  = 0;
+
+    // Live counters — checked on every pick to gate item selection
+    let liveFloorFP  = 0;
+    let liveDrums    = 0;
+    let liveHeavy    = 0;
+    let liveSupport  = 0;
+    let liveDG       = 0;  // total DG-class items (flammable + corrosive + oxidiser)
+    const maxDGItems = Math.min(3, Math.round((cfg.dg || 0) * 4)); // 0 on Standard/Busy
+
+    const hardCap = Math.min(18, Math.ceil(targetCells / 2));
+
+    // Ensure at least one support item starts the manifest on every attempt
+    // (pick the first support item from the shuffled pool, add it unconditionally)
+    const firstSupport = shuffledPool.find(isSupport);
+    if (firstSupport) {
+      candidates.push({ ...firstSupport, uid: newUid('c'), rotation: 0 });
+      cellsBuilding += firstSupport.w * firstSupport.h;
+      liveSupport++;
+    }
+
+    let stuckCounter = 0; // prevent infinite spin if pool is too constrained
+    while (cellsBuilding < targetCells * 1.2 && candidates.length < hardCap) {
+      const tpl  = shuffledPool[Math.floor(Math.random() * shuffledPool.length)];
+      const area = tpl.w * tpl.h;
+
+      // Volume guard
+      if (cellsBuilding + area > targetCells * 1.35) { stuckCounter++; if (stuckCounter > 60) break; continue; }
+
+      // Per-item balance gates (reject the pick, try another)
+      const wouldFP    = tpl.prefersFloor ? liveFloorFP + Math.min(tpl.w, tpl.h) : liveFloorFP;
+      const wouldDrums = tpl.id === 'barrel' ? liveDrums + 1 : liveDrums;
+      const wouldHeavy = tpl.weightClass === 'H' ? liveHeavy + 1 : liveHeavy;
+
+      if (wouldFP    > effMaxFloorFP)  { stuckCounter++; if (stuckCounter > 60) break; continue; }
+      if (wouldDrums > effMaxDrums)    { stuckCounter++; if (stuckCounter > 60) break; continue; }
+      if (wouldHeavy > effMaxHeavy)    { stuckCounter++; if (stuckCounter > 60) break; continue; }
+      if (tpl.dgClass && liveDG >= maxDGItems) { stuckCounter++; if (stuckCounter > 60) break; continue; }
+
+      stuckCounter = 0; // valid pick — reset
+      candidates.push({ ...tpl, uid: newUid('c'), rotation: 0 });
+      cellsBuilding += area;
+      if (tpl.prefersFloor)      liveFloorFP += Math.min(tpl.w, tpl.h);
+      if (tpl.id === 'barrel')   liveDrums++;
+      if (tpl.weightClass === 'H') liveHeavy++;
+      if (isSupport(tpl))        liveSupport++;
+      if (tpl.dgClass)           liveDG++;
+    }
+
+    // Enforce minimum support ratio by topping up if needed
+    const neededSupport = Math.ceil(candidates.length * effMinSupportRatio);
+    if (liveSupport < neededSupport) {
+      const supportPool = shuffledPool.filter(isSupport);
+      for (let s = liveSupport; s < neededSupport && supportPool.length > 0; s++) {
+        const tpl = supportPool[s % supportPool.length];
+        if (cellsBuilding + tpl.w * tpl.h <= targetCells * 1.35) {
+          candidates.push({ ...tpl, uid: newUid('c'), rotation: 0 });
+          cellsBuilding += tpl.w * tpl.h;
+          liveSupport++;
+        }
+      }
+    }
+
+    // Full validation pass before packing
+    if (!validateManifest(candidates)) continue;
+
+    const result = greedyPack(candidates);
+    const util   = result.usedCells / CAP;
+    const score  = 1 - Math.abs(util - targetUtil);
+
+    if (score > bestScore) {
+      bestScore = score;
+
+      const placedUids = new Set(result.placed.map(p => p.uid));
+      let kept = candidates.filter(c => placedUids.has(c.uid));
+
+      // At most 1 challenge extra on diff ≥ 2: must be small/medium, non-floor-pref
+      if (state.diff >= 2) {
+        const extras = candidates.filter(c =>
+          !placedUids.has(c.uid) &&
+          c.weightClass !== 'H' &&
+          !c.prefersFloor &&
+          c.w * c.h <= 4
+        );
+        if (extras.length > 0) kept.push(extras[0]);
+      }
+
+      kept = kept.map(c => ({ ...c, uid: newUid('cargo') }));
+      if (!validateManifest(kept)) continue;
+
+      bestCargo  = kept;
+      bestLayout = greedyPack(kept).placed;
+    }
+  }
+
+  // Fallback: if all attempts failed validation, generate a guaranteed-safe simple load
+  if (bestCargo.length === 0) {
+    const safeTypes = ['pallet','crate','smallbox','pallet','crate'];
+    let i = 0, cells = 0;
+    while (cells < targetCells * 0.8) {
+      const id  = safeTypes[i % safeTypes.length];
+      const tpl = CARGO_TYPES.find(c => c.id === id);
+      bestCargo.push({ ...tpl, uid: newUid('safe'), rotation: 0 });
+      cells += tpl.w * tpl.h;
+      i++;
+      if (i > 15) break;
+    }
+    bestLayout = greedyPack(bestCargo).placed;
+  }
+
+  state.cargo = bestCargo;
+  state.rotationState = {};
+  state.cargo.forEach(c => { state.rotationState[c.uid] = 0; });
+  state.optimalLayout = bestLayout.map(p => ({ uid: p.uid, col: p.col, row: p.row, rot: p.rot }));
+}
+
+// ================================================================
+// MANIFEST RENDER
+// ================================================================
+
+function renderManifest() {
+  reconcilePlacedCargo(); // keep manifest display in sync with grid
+  const el = $('manifest-items');
+  el.innerHTML = '';
+  const issueMap = state.placedCargo.size > 0 ? analyseLoad() : {};
+  state.cargo.forEach(c => {
+    const placed = state.placedCargo.has(c.uid);
+    const sel    = state.selectedId === c.uid;
+    const rot    = state.rotationState[c.uid] || 0;
+    const w = rot ? c.h : c.w;
+    const h = rot ? c.w : c.h;
+    const iss = issueMap[c.uid] || {};
+    const hasIssue = placed && (iss.unsupported || iss.crushed || iss.unstableDrum);
+    const div = document.createElement('div');
+    div.className = 'manifest-item' + (placed ? ' placed' : '') + (sel ? ' selected' : '');
+    div.dataset.uid = c.uid; // required by getUidFromPointer
+    if (hasIssue) div.style.borderColor = iss.crushed ? 'var(--red)' : 'var(--orange)';
+    const wLabel = c.weightClass === 'L' ? 'LIGHT' : c.weightClass === 'H' ? 'HEAVY' : 'MED';
+    div.innerHTML = `
+      <div class="manifest-item-icon">${c.icon}</div>
+      <div class="manifest-item-label">${c.label}</div>
+      <div class="manifest-item-dims">${w}×${h}</div>
+      <div><span class="wclass-badge wclass-${c.weightClass}">${wLabel}</span></div>
+      <div class="manifest-item-value">$${c.value.toLocaleString()}</div>
+    `;
+    // Pointer events are handled by the global onPointerDown on #screen-game.
+    // No per-item listeners needed — data-uid is the link.
+    el.appendChild(div);
+  });
+
+  // Update arrow visibility after DOM settles
+  requestAnimationFrame(updateManifestArrows);
+}
+
+// ── Manifest scroll arrows ─────────────────────────────────────────
+function scrollManifest(direction) {
+  const el = $('manifest-items');
+  if (!el) return;
+  // Scroll by ~2 card widths (cards are ~76px wide including gap)
+  el.scrollBy({ left: direction * 76 * 2, behavior: 'smooth' });
+  // Re-check after smooth scroll animation (~300ms) finishes
+  setTimeout(updateManifestArrows, 350);
+}
+
+function updateManifestArrows() {
+  const el   = $('manifest-items');
+  const btnL = $('manifest-arrow-left');
+  const btnR = $('manifest-arrow-right');
+  if (!el || !btnL || !btnR) return;
+
+  const scrollable = el.scrollWidth > el.clientWidth + 4;
+  const atStart    = el.scrollLeft <= 2;
+  const atEnd      = el.scrollLeft >= el.scrollWidth - el.clientWidth - 2;
+
+  // Hide both if no overflow (everything fits)
+  btnL.classList.toggle('hidden', !scrollable || atStart);
+  btnR.classList.toggle('hidden', !scrollable || atEnd);
+}
+
+function selectCargo(uid) {
+  if (state.placedCargo.has(uid)) { selectPlacedCargo(uid); return; }
+  state.selectedId = state.selectedId === uid ? null : uid;
+  updateUnloadButton();
+  updateContainerLabel();
+  renderManifest();
+  renderContainer();
+}
+
+// Select an already-placed cargo item (from manifest tray or canvas tap)
+function selectPlacedCargo(uid) {
+  if (state.selectedId === uid) {
+    // Second tap on same placed cargo = unload it
+    unloadSelected();
+    return;
+  }
+  state.selectedId = uid;
+  updateUnloadButton();
+  updateContainerLabel();
+  renderManifest();
+  renderContainer();
+}
+
+function updateContainerLabel() {
+  const lbl = $('container-label');
+  if (!state.selectedId) {
+    lbl.textContent = 'TAP CARGO IN MANIFEST · TAP PLACED CARGO TO REWORK';
+  } else if (state.placedCargo.has(state.selectedId)) {
+    const c = state.cargo.find(x => x.uid === state.selectedId);
+    lbl.textContent = `${c ? c.label.toUpperCase() : 'CARGO'} SELECTED · TAP NEW POSITION · UNLOAD OR CANCEL`;
+  } else {
+    const c = state.cargo.find(x => x.uid === state.selectedId);
+    lbl.textContent = `${c ? c.label.toUpperCase() : 'CARGO'} READY · TAP CONTAINER TO PLACE · CANCEL TO DESELECT`;
+  }
+}
+
+// ================================================================
+// CONTAINER CANVAS RENDER
+// ================================================================
+
+function getCargoAtGrid(col, row) {
+  if (row < 0 || row >= state.ROWS || col < 0 || col >= state.COLS) return null;
+  const uid = state.grid[row][col];
+  if (!uid) return null;
+  return state.cargo.find(c => c.uid === uid);
+}
+
+function renderContainer(hoverCol, hoverRow) {
+  // Fall back to drag state if no explicit hover coords passed
+  const previewCol = hoverCol !== undefined ? hoverCol : drag.hoverCol;
+  const previewRow = hoverRow !== undefined ? hoverRow : drag.hoverRow;
+  const canvas = $('container-canvas');
+  const ctx = canvas.getContext('2d');
+  const CELL = state.CELL;
+  const PAD = 10;
+  const W = canvas.width;
+  const H = canvas.height;
+
+  ctx.clearRect(0, 0, W, H);
+
+  // Container BG
+  ctx.fillStyle = '#0d1420';
+  ctx.strokeStyle = '#2a3448';
+  ctx.lineWidth = 2;
+  roundRect(ctx, 0, 0, W, H, 4, true, true);
+
+  // Grid lines
+  ctx.strokeStyle = '#1a2230';
+  ctx.lineWidth = 0.5;
+  for (let c = 1; c < state.COLS; c++) {
+    ctx.beginPath(); ctx.moveTo(PAD + c * CELL, PAD); ctx.lineTo(PAD + c * CELL, H - PAD); ctx.stroke();
+  }
+  for (let r = 1; r < state.ROWS; r++) {
+    ctx.beginPath(); ctx.moveTo(PAD, PAD + r * CELL); ctx.lineTo(W - PAD, PAD + r * CELL); ctx.stroke();
+  }
+
+  // Container ribs
+  ctx.strokeStyle = '#232c3a'; ctx.lineWidth = 1;
+  const ribEvery = Math.ceil(state.COLS / 4);
+  for (let c = ribEvery; c < state.COLS; c += ribEvery) {
+    ctx.beginPath(); ctx.moveTo(PAD + c * CELL, 0); ctx.lineTo(PAD + c * CELL, H); ctx.stroke();
+  }
+
+  // Get current issues for visual warnings
+  const issueMap = state.placedCargo.size > 0 ? analyseLoad() : {};
+
+  // Floor indicator line
+  ctx.strokeStyle = 'rgba(232,160,32,0.15)'; ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(PAD, PAD + (state.ROWS-1) * CELL); ctx.lineTo(W - PAD*2, PAD + (state.ROWS-1) * CELL); ctx.stroke();
+
+  // Placed cargo
+  state.cargo.forEach(cargo => {
+    if (!state.placedCargo.has(cargo.uid)) return;
+    const rot = state.rotationState[cargo.uid] || 0;
+    const cw = rot ? cargo.h : cargo.w;
+    const ch = rot ? cargo.w : cargo.h;
+    let px = -1, py = -1;
+    outer:for (let r = 0; r < state.ROWS; r++) {
+      for (let c = 0; c < state.COLS; c++) {
+        if (state.grid[r][c] === cargo.uid) { py = r; px = c; break outer; }
+      }
+    }
+    if (px === -1) return;
+    drawCargo(ctx, cargo, px, py, cw, ch, PAD, CELL, false, issueMap[cargo.uid]);
+  });
+
+  // Hover/drag preview — show ghost placement in container
+  const previewActive = previewCol !== undefined ? (previewCol >= 0) : (drag.hoverCol >= 0);
+  const showCol = previewCol !== undefined ? previewCol : drag.hoverCol;
+  const showRow = previewRow !== undefined ? previewRow : drag.hoverRow;
+  if (state.selectedId && previewActive) {
+    const cargo = state.cargo.find(c => c.uid === state.selectedId);
+    if (cargo) {
+      const rot = state.rotationState[cargo.uid] || 0;
+      const cw = rot ? cargo.h : cargo.w;
+      const ch = rot ? cargo.w : cargo.h;
+      const canPlace = checkCanPlace(showCol, showRow, cw, ch, cargo.uid);
+      ctx.globalAlpha = 0.48;
+      drawCargo(ctx, cargo, showCol, showRow, cw, ch, PAD, CELL, !canPlace, null);
+      ctx.globalAlpha = 1;
+    }
+  }
+
+  // Container frame overlay
+  ctx.strokeStyle = '#3a4a60'; ctx.lineWidth = 2;
+  roundRect(ctx, 0, 0, W, H, 4, false, true);
+
+  // Door end
+  ctx.fillStyle = '#1e2535';
+  ctx.fillRect(W - PAD + 1, PAD, PAD - 2, H - PAD * 2);
+  ctx.strokeStyle = '#3a4a60'; ctx.lineWidth = 1;
+  ctx.strokeRect(W - PAD + 1, PAD, PAD - 2, H - PAD * 2);
+  ctx.fillStyle = '#e8a020';
+  ctx.beginPath(); ctx.arc(W - 3, H/2 - 6, 3, 0, Math.PI*2); ctx.fill();
+  ctx.beginPath(); ctx.arc(W - 3, H/2 + 6, 3, 0, Math.PI*2); ctx.fill();
+}
+
+function drawCargo(ctx, cargo, col, row, cw, ch, PAD, CELL, invalid, iss) {
+  const x = PAD + col * CELL;
+  const y = PAD + row * CELL;
+  const pw = cw * CELL - 2;
+  const ph = ch * CELL - 2;
+  const hasCrush = iss && iss.crushed;
+  const hasFloat = iss && iss.unsupported;
+  const hasDrum  = iss && iss.unstableDrum;
+  const hasDG    = iss && iss.dgConflict;
+
+  // Determine fill/stroke based on warnings
+  let fillColor = cargo.color;
+  let strokeColor = cargo.stroke;
+  let strokeW = 1.5;
+  if (invalid)   { fillColor = '#4a1a1a'; strokeColor = '#aa2a2a'; }
+  else if (hasCrush) { fillColor = '#4a2a1a'; strokeColor = '#e74c3c'; strokeW = 2; }
+  else if (hasFloat) { fillColor = '#2a1a2a'; strokeColor = '#e74c3c'; strokeW = 2; }
+  else if (hasDG)    { strokeColor = '#f39c12'; strokeW = 2.5; }
+  else if (hasDrum)  { strokeColor = '#f39c12'; strokeW = 2; }
+
+  ctx.fillStyle = fillColor;
+  ctx.strokeStyle = strokeColor;
+  ctx.lineWidth = strokeW;
+  roundRect(ctx, x + 1, y + 1, pw, ph, 3, true, true);
+
+  // Fragile hatching
+  if (cargo.fragile) {
+    ctx.save();
+    ctx.beginPath(); roundRect(ctx, x+1, y+1, pw, ph, 3, false, false); ctx.clip();
+    ctx.strokeStyle = hasCrush ? 'rgba(231,76,60,0.4)' : cargo.stroke + '60';
+    ctx.lineWidth = 0.8;
+    for (let i = -ph; i < pw; i += 6) {
+      ctx.beginPath(); ctx.moveTo(x+1+i, y+1); ctx.lineTo(x+1+i+ph, y+1+ph); ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // DG class stripe — colour-coded bottom band with class-specific pattern
+  if (cargo.dgClass) {
+    const dgColors = {
+      flammable: { bg:'#c04010', alt:'#801008' },
+      corrosive:  { bg:'#10aa30', alt:'#086018' },
+      oxidiser:   { bg:'#e8a020', alt:'#000000' },
+    };
+    const dc = dgColors[cargo.dgClass] || { bg:'#e8a020', alt:'#000' };
+    const stripeH = Math.max(4, Math.round(ph * 0.18));
+    // Alternating hazard chevron stripe
+    ctx.save();
+    ctx.beginPath(); ctx.rect(x+1, y+ph-stripeH+1, pw, stripeH); ctx.clip();
+    const stripeW = stripeH * 1.5;
+    for (let sx = x+1; sx < x+pw+stripeW; sx += stripeW*2) {
+      ctx.fillStyle = dc.bg;
+      ctx.fillRect(sx, y+ph-stripeH+1, stripeW, stripeH);
+      ctx.fillStyle = dc.alt;
+      ctx.fillRect(sx+stripeW, y+ph-stripeH+1, stripeW, stripeH);
+    }
+    // DG class initial
+    ctx.fillStyle = '#fff';
+    ctx.font = `bold ${Math.max(7, stripeH-2)}px sans-serif`;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+    const dgInitial = cargo.dgClass === 'flammable' ? 'F' : cargo.dgClass === 'corrosive' ? 'C' : 'O';
+    ctx.fillText(dgInitial, x+3, y+ph-stripeH/2+1);
+    ctx.restore();
+  }
+
+  // Weight class bar at top
+  const wBarColor = cargo.weightClass === 'H' ? '#e74c3c' : cargo.weightClass === 'L' ? '#3b9eff' : '#e8a020';
+  ctx.fillStyle = wBarColor + '66';
+  ctx.fillRect(x+1, y+1, pw, 3);
+
+  // Icon
+  ctx.font = `${Math.max(12, CELL - 8)}px serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  const savedAlpha = ctx.globalAlpha;
+  ctx.globalAlpha = savedAlpha * 0.88;
+  ctx.fillText(cargo.icon, x + pw/2 + 1, y + ph/2 + 1);
+  ctx.globalAlpha = savedAlpha;
+
+  // Warning overlays
+  if (hasCrush) {
+    // Red X indicator in corner
+    ctx.font = `bold ${Math.max(9, CELL-14)}px sans-serif`;
+    ctx.fillStyle = '#e74c3c';
+    ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+    ctx.fillText('✕', x+pw-1, y+2);
+  }
+  if (hasFloat) {
+    // Dashed red border overlay to show floating
+    ctx.setLineDash([3, 2]);
+    ctx.strokeStyle = '#e74c3c';
+    ctx.lineWidth = 1.5;
+    roundRect(ctx, x+1, y+1, pw, ph, 3, false, true);
+    ctx.setLineDash([]);
+    // Small arrow down (needs floor)
+    ctx.fillStyle = '#e74c3c';
+    ctx.font = `${Math.max(9,CELL-14)}px sans-serif`;
+    ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+    ctx.fillText('↓', x+2, y+2);
+  }
+  if (hasDrum) {
+    // Orange wobble dot
+    ctx.fillStyle = '#f39c12';
+    ctx.beginPath(); ctx.arc(x+pw-4, y+4, 3, 0, Math.PI*2); ctx.fill();
+  }
+  if (hasDG) {
+    // Amber dashed border + ⚠ badge — DG separation risk
+    ctx.save();
+    ctx.setLineDash([4, 2]);
+    ctx.strokeStyle = '#f39c12';
+    ctx.lineWidth = 2;
+    roundRect(ctx, x+1, y+1, pw, ph, 3, false, true);
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#f39c12';
+    ctx.font = `bold ${Math.max(8, CELL-14)}px sans-serif`;
+    ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+    ctx.fillText('⚠', x+pw-1, y+1);
+    ctx.restore();
+  }
+
+  // Selected highlight
+  if (cargo.uid === state.selectedId) {
+    const isPlacedSelected = state.placedCargo.has(cargo.uid);
+    if (isPlacedSelected) {
+      // "Lifted" look — bright cyan border + corner lift arrows
+      ctx.strokeStyle = '#20d4e0'; ctx.lineWidth = 2.5;
+      roundRect(ctx, x, y, pw+2, ph+2, 4, false, true);
+      // Corner arrows indicating liftable
+      ctx.fillStyle = '#20d4e0';
+      ctx.font = `bold ${Math.max(8, CELL-16)}px sans-serif`;
+      ctx.textAlign = 'left'; ctx.textBaseline = 'top';
+      ctx.fillText('↑', x+2, y+1);
+    } else {
+      // Manifest-selected (being placed) — gold border
+      ctx.strokeStyle = '#e8a020'; ctx.lineWidth = 2;
+      roundRect(ctx, x+1, y+1, pw, ph, 3, false, true);
+    }
+  }
+
+  ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+}
+
+function roundRect(ctx, x, y, w, h, r, fill, stroke) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+  if (fill) ctx.fill();
+  if (stroke) ctx.stroke();
+}
+
+// ================================================================
+// PLACEMENT LOGIC
+// ================================================================
+
+function checkCanPlace(col, row, cw, ch, excludeUid) {
+  if (col < 0 || row < 0 || col + cw > state.COLS || row + ch > state.ROWS) return false;
+  for (let r = row; r < row + ch; r++) {
+    for (let c = col; c < col + cw; c++) {
+      if (state.grid[r][c] && state.grid[r][c] !== excludeUid) return false;
+    }
+  }
+  return true;
+}
+
+function placeCargo(uid, col, row) {
+  const cargo = state.cargo.find(c => c.uid === uid);
+  if (!cargo) return false;
+  const rot = state.rotationState[uid] || 0;
+  const cw = rot ? cargo.h : cargo.w;
+  const ch = rot ? cargo.w : cargo.h;
+
+  if (!checkCanPlace(col, row, cw, ch, uid)) return false;
+
+  // Remove from old position if re-placing
+  if (state.placedCargo.has(uid)) {
+    for (let r = 0; r < state.ROWS; r++)
+      for (let c = 0; c < state.COLS; c++)
+        if (state.grid[r][c] === uid) state.grid[r][c] = null;
+  }
+
+  // Place
+  for (let r = row; r < row + ch; r++)
+    for (let c = col; c < col + cw; c++)
+      state.grid[r][c] = uid;
+
+  state.placedCargo.add(uid);
+  playSound('place');
+  return true;
+}
+
+function removeCargo(uid) {
+  for (let r = 0; r < state.ROWS; r++)
+    for (let c = 0; c < state.COLS; c++)
+      if (state.grid[r][c] === uid) state.grid[r][c] = null;
+  state.placedCargo.delete(uid);
+}
+
+// ================================================================
+// UNIFIED POINTER DRAG SYSTEM — hardened for mobile stability
+// ================================================================
+
+const drag = {
+  active:    false,   // true once threshold crossed and ghost is live
+  pending:   false,   // true from pointerdown until threshold or release
+  uid:       null,    // cargo uid being dragged (or '__canvas__' sentinel)
+  pointerId: null,
+  captureEl: null,
+  startX: 0, startY: 0,
+  lastX:  0, lastY:  0,
+  wasMoved:  false,
+  ghostOffX: 0, ghostOffY: 0,
+  hoverCol: -1, hoverRow: -1,
+};
+
+const DRAG_THRESHOLD = 6;   // px travel before drag mode activates
+const THUMB_OFFSET_Y = 32;  // lift ghost above finger (portrait mobile)
+
+// Cached layout rects — populated at pointerdown, cleared on cleanup
+let _cachedCanvasRect   = null;
+let _cachedManifestRect = null;
+
+// ── Setup (safe to call multiple times) ───────────────────────────
+let _mouseMoveBound = false;
+function setupContainerTouch() {
+  const screen = $('screen-game');
+  screen.onpointerdown   = onPointerDown;
+  screen.onpointermove   = onPointerMove;
+  screen.onpointerup     = onPointerUp;
+  screen.onpointercancel = onPointerCancel;
+
+  // Keep manifest arrows in sync when user swipes the tray manually
+  const manifestEl = $('manifest-items');
+  if (manifestEl && !manifestEl._scrollListenerAdded) {
+    manifestEl._scrollListenerAdded = true;
+    manifestEl.addEventListener('scroll', updateManifestArrows, { passive: true });
+  }
+
+  // Safety net: if window loses focus mid-drag, force cleanup
+  window.addEventListener('blur',             fullDragCleanup, { passive: true });
+  document.addEventListener('visibilitychange', () => {
+    if (document.hidden) fullDragCleanup();
+  }, { passive: true });
+
+  // Escape key cancels selection on desktop
+  if (!_mouseMoveBound) { // reuse flag — these also only need one registration
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && $('screen-game').classList.contains('active')) {
+        cancelSelection();
+      }
+    });
+  }
+
+  // Desktop hover preview — only attach once
+  if (!_mouseMoveBound) {
+    _mouseMoveBound = true;
+    const canvas = $('container-canvas');
+    canvas.addEventListener('mousemove',  onCanvasMouseMove,  { passive: true });
+    canvas.addEventListener('mouseleave', onCanvasMouseLeave, { passive: true });
+  }
+}
+
+function onCanvasMouseMove(e) {
+  if (drag.active || drag.pending || !state.selectedId) return;
+  const cell = clientToGrid(e.clientX, e.clientY);
+  if (cell.col !== drag.hoverCol || cell.row !== drag.hoverRow) {
+    drag.hoverCol = cell.col;
+    drag.hoverRow = cell.row;
+    renderContainer();
+  }
+}
+function onCanvasMouseLeave() {
+  if (drag.active || drag.pending) return;
+  drag.hoverCol = -1; drag.hoverRow = -1;
+  renderContainer();
+}
+
+// ── Coordinate helpers ─────────────────────────────────────────────
+function clientToGrid(clientX, clientY) {
+  try {
+    const canvas = $('container-canvas');
+    if (!canvas) return { col: -1, row: -1 };
+    const rect   = _cachedCanvasRect || canvas.getBoundingClientRect();
+    if (!rect.width) return { col: -1, row: -1 };
+    const scaleX = canvas.width  / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (clientX - rect.left) * scaleX - 10;
+    const y = (clientY - rect.top)  * scaleY - 10;
+    return {
+      col: Math.floor(x / state.CELL),
+      row: Math.floor(y / state.CELL),
+    };
+  } catch (_) { return { col: -1, row: -1 }; }
+}
+
+function isOverCanvas(cx, cy) {
+  try {
+    const r = _cachedCanvasRect || $('container-canvas').getBoundingClientRect();
+    return cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom;
+  } catch (_) { return false; }
+}
+function isOverManifest(cx, cy) {
+  try {
+    const r = _cachedManifestRect || $('manifest-panel').getBoundingClientRect();
+    return cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom;
+  } catch (_) { return false; }
+}
+
+// ── Ghost rendering ────────────────────────────────────────────────
+function buildGhost(cargo) {
+  try {
+    const rot      = (state.rotationState[cargo.uid] || 0);
+    const cw       = rot ? cargo.h : cargo.w;
+    const ch       = rot ? cargo.w : cargo.h;
+    const cellSize = Math.min(state.CELL, 42);
+    const gw       = cw * cellSize;
+    const gh       = ch * cellSize;
+
+    const gc  = $('drag-ghost');
+    gc.width  = gw;
+    gc.height = gh;
+    gc.style.width   = gw + 'px';
+    gc.style.height  = gh + 'px';
+    gc.style.display = 'block';
+    gc.style.opacity = '0.92';
+
+    const ctx = gc.getContext('2d');
+    ctx.clearRect(0, 0, gw, gh);
+
+    const savedCell = state.CELL;
+    state.CELL = cellSize;
+    drawCargo(ctx, cargo, 0, 0, cw, ch, 0, cellSize, false, null);
+    state.CELL = savedCell;       // always restore, even if drawCargo throws
+
+    // Lift outline — use arc fallback for browsers without roundRect
+    ctx.strokeStyle = 'rgba(32,212,224,0.9)';
+    ctx.lineWidth   = 2.5;
+    ctx.beginPath();
+    if (typeof ctx.roundRect === 'function') {
+      ctx.roundRect(1, 1, gw - 2, gh - 2, 4);
+    } else {
+      ctx.rect(1, 1, gw - 2, gh - 2);
+    }
+    ctx.stroke();
+
+    drag.ghostOffX = gw / 2;
+    drag.ghostOffY = gh / 2 + THUMB_OFFSET_Y;
+  } catch (err) {
+    console.warn('buildGhost error:', err);
+    // Ghost failed — hide it so we don't get a blank floating element
+    $('drag-ghost').style.display = 'none';
+  }
+}
+
+function moveGhost(cx, cy) {
+  try {
+    const x = cx - drag.ghostOffX;
+    const y = cy - drag.ghostOffY;
+    $('drag-ghost').style.transform = `translate(${x}px,${y}px)`;
+  } catch (_) {}
+}
+
+function hideGhost() {
+  try {
+    const gc = $('drag-ghost');
+    gc.style.display   = 'none';
+    gc.style.transform = 'translate(0,0)';
+  } catch (_) {}
+}
+
+// ── Lifting class (immediate press feedback) ───────────────────────
+function setLiftingClass(uid) {
+  try {
+    document.querySelectorAll('.manifest-item').forEach(el => {
+      el.classList.toggle('drag-lifting', !!uid && el.dataset.uid === uid);
+    });
+  } catch (_) {}
+}
+
+// ── Master cleanup — call this from EVERY exit path ────────────────
+function fullDragCleanup() {
+  // Release pointer capture safely
+  if (drag.captureEl && drag.pointerId !== null) {
+    try { drag.captureEl.releasePointerCapture(drag.pointerId); } catch (_) {}
+  }
+
+  hideGhost();
+  setLiftingClass(null);
+
+  try { $('manifest-panel').classList.remove('drag-over'); } catch (_) {}
+
+  _cachedCanvasRect   = null;
+  _cachedManifestRect = null;
+
+  drag.active    = false;
+  drag.pending   = false;
+  drag.uid       = null;
+  drag.pointerId = null;
+  drag.captureEl = null;
+  drag.wasMoved  = false;
+  drag.hoverCol  = -1;
+  drag.hoverRow  = -1;
+}
+
+// ── Pointer events ─────────────────────────────────────────────────
+function onPointerDown(e) {
+  try {
+    // Gate checks
+    if ($('risk-overlay').classList.contains('show'))       return;
+    if ($('overbooked-overlay').classList.contains('show')) return;
+    if ($('cutoff-overlay').classList.contains('show'))     return;
+    if ($('briefing-overlay').classList.contains('show'))   return;
+    if ($('return-overlay').classList.contains('show'))     return;
+    if ($('addcargo-overlay').classList.contains('show'))   return;
+    if (e.target.closest('.controls-bar'))                  return;
+    if (e.target.closest('.manifest-arrow'))                return;
+    if (e.target.closest('.hud-menu-btn'))                  return; // arrow scroll buttons
+    if (!$('screen-game').classList.contains('active'))     return;
+    if (drag.pending || drag.active)                        return;
+
+    const uid = uidFromEvent(e);
+
+    // Tap on dead space (not canvas, not manifest item) → cancel selection
+    if (!uid) {
+      if (state.selectedId) cancelSelection();
+      return;
+    }
+
+    // Capture on the item or canvas element (not a child span)
+    const captureEl = e.target.closest('.manifest-item') || e.target;
+    try { captureEl.setPointerCapture(e.pointerId); } catch (_) {}
+
+    drag.pending      = true;
+    drag.active       = false;
+    drag.uid          = uid;
+    drag.pointerId    = e.pointerId;
+    drag.captureEl    = captureEl;
+    drag.startX       = drag.lastX = e.clientX;
+    drag.startY       = drag.lastY = e.clientY;
+    drag.wasMoved     = false;
+    drag.hoverCol     = -1;
+    drag.hoverRow     = -1;
+    drag.ghostOffX    = 0;
+    drag.ghostOffY    = 0;
+
+    // Cache layout rects once — avoids reflow on every move
+    _cachedCanvasRect   = $('container-canvas').getBoundingClientRect();
+    _cachedManifestRect = $('manifest-panel').getBoundingClientRect();
+
+    // Immediate press feedback (manifest items only)
+    if (uid !== '__canvas__') setLiftingClass(uid);
+
+    e.preventDefault();
+  } catch (err) {
+    console.error('onPointerDown error:', err);
+    fullDragCleanup();
+  }
+}
+
+function onPointerMove(e) {
+  try {
+    if (!drag.pending) return;
+    if (e.pointerId !== drag.pointerId) return;
+
+    drag.lastX = e.clientX;
+    drag.lastY = e.clientY;
+
+    if (!drag.active) {
+      if (drag.uid === '__canvas__') return; // empty-canvas press — no drag
+      const dist = Math.hypot(drag.lastX - drag.startX, drag.lastY - drag.startY);
+      if (dist < DRAG_THRESHOLD) return;
+
+      // ── Activate drag ──
+      drag.active   = true;
+      drag.wasMoved = true;
+
+      if (state.selectedId !== drag.uid) {
+        state.selectedId = drag.uid;
+        updateUnloadButton();
+        updateContainerLabel();
+      }
+
+      const cargo = state.cargo.find(c => c.uid === drag.uid);
+      if (!cargo) { fullDragCleanup(); renderContainer(); return; }
+
+      buildGhost(cargo);
+      moveGhost(drag.lastX, drag.lastY);
+      renderManifest();
+      renderContainer();
+      return; // skip preview update on activation frame
+    }
+
+    // ── Active drag: move ghost + update grid preview ──
+    moveGhost(drag.lastX, drag.lastY);
+
+    const isPlaced = drag.uid !== '__canvas__' && state.placedCargo.has(drag.uid);
+    $('manifest-panel').classList.toggle('drag-over',
+      isOverManifest(drag.lastX, drag.lastY) && isPlaced);
+
+    if (isOverCanvas(drag.lastX, drag.lastY)) {
+      const cell = clientToGrid(drag.lastX, drag.lastY - THUMB_OFFSET_Y);
+      if (cell.col !== drag.hoverCol || cell.row !== drag.hoverRow) {
+        drag.hoverCol = cell.col;
+        drag.hoverRow = cell.row;
+        renderContainer();
+      }
+    } else if (drag.hoverCol !== -1) {
+      drag.hoverCol = -1;
+      drag.hoverRow = -1;
+      renderContainer();
+    }
+
+    e.preventDefault();
+  } catch (err) {
+    console.error('onPointerMove error:', err);
+    fullDragCleanup();
+    renderContainer();
+  }
+}
+
+function onPointerUp(e) {
+  try {
+    if (!drag.pending) return;
+    if (e.pointerId !== drag.pointerId) return;
+
+    const uid       = drag.uid;
+    const wasActive = drag.active;
+    const cx        = e.clientX;
+    const cy        = e.clientY;
+
+    // Cleanup visuals first — before any logic that might throw
+    fullDragCleanup();
+
+    if (wasActive && uid && uid !== '__canvas__') {
+      // ── Drop logic ──
+      if (isOverManifest(cx, cy) && state.placedCargo.has(uid)) {
+        doUnload(uid);
+      } else if (isOverCanvas(cx, cy)) {
+        const cell1 = clientToGrid(cx, cy - THUMB_OFFSET_Y); // ghost-centre cell
+        const cell2 = clientToGrid(cx, cy);                   // exact finger cell
+        const placed =
+          tryPlace(uid, cell1.col, cell1.row) ||
+          tryPlace(uid, cell2.col, cell2.row) ||
+          tryPlaceNearby(uid, cell1.col, cell1.row);
+
+        if (!placed) {
+          playSound('error');
+          showToast("CAN'T FIT HERE");
+          renderContainer();
+        }
+      } else {
+        // Released outside valid zones — deselect cleanly
+        state.selectedId = null;
+        updateUnloadButton();
+        updateContainerLabel();
+        renderManifest();
+        renderContainer();
+      }    } else if (!wasActive && uid) {
+      // ── Tap ──
+      handleTap(uid, cx, cy);
+    }
+  } catch (err) {
+    console.error('onPointerUp error:', err);
+    fullDragCleanup();
+    renderContainer();
+  }
+}
+
+function onPointerCancel(e) {
+  try {
+    if (e.pointerId !== drag.pointerId) return;
+    fullDragCleanup();
+    renderContainer();
+  } catch (err) {
+    console.error('onPointerCancel error:', err);
+    fullDragCleanup();
+  }
+}
+
+// ── uidFromEvent ───────────────────────────────────────────────────
+function uidFromEvent(e) {
+  try {
+    const item = e.target.closest('.manifest-item');
+    if (item?.dataset?.uid) return item.dataset.uid;
+
+    if (e.target === $('container-canvas') || e.target.closest('#container-outer')) {
+      const cell = clientToGrid(e.clientX, e.clientY);
+      if (cell.row >= 0 && cell.row < state.ROWS &&
+          cell.col >= 0 && cell.col < state.COLS) {
+        const uid = state.grid[cell.row]?.[cell.col];
+        if (uid) return uid;
+      }
+      return '__canvas__';
+    }
+  } catch (_) {}
+  return null;
+}
+
+// ── Placement helpers ──────────────────────────────────────────────
+// Try placing at exactly one cell. Returns true on success.
+function tryPlace(uid, col, row) {
+  try {
+    if (!Number.isFinite(col) || !Number.isFinite(row)) return false;
+    if (!state.cargo.find(c => c.uid === uid)) return false;
+    if (!placeCargo(uid, col, row)) return false;
+
+    const cargo = state.cargo.find(c => c.uid === uid);
+    if (cargo) {
+      const rot = state.rotationState[uid] || 0;
+      const ch  = rot ? cargo.w : cargo.h;
+      if (cargo.prefersFloor && (row + ch) < state.ROWS) showToast('⚠ PREFERS FLOOR', 900);
+      else if (cargo.prefersTop && row > 1)               showToast('⚠ LOAD FRAGILE HIGHER', 900);
+    }
+    state.selectedId = null;
+    updateUnloadButton();
+    updateContainerLabel();
+    renderManifest();
+    renderContainer();
+    updateStatusBars();
+    checkQoLWarnings();
+    if (state.cargo.every(c => state.placedCargo.has(c.uid))) showToast('ALL CARGO LOADED!', 1500);
+    return true;
+  } catch (err) {
+    console.warn('tryPlace error:', err);
+    return false;
+  }
+}
+
+// Try ±1 cells around (col, row). Returns true if any succeeded.
+function tryPlaceNearby(uid, col, row) {
+  for (let dr = -1; dr <= 1; dr++) {
+    for (let dc = -1; dc <= 1; dc++) {
+      if (dr === 0 && dc === 0) continue;
+      if (tryPlace(uid, col + dc, row + dr)) return true;
+    }
+  }
+  return false;
+}
+
+// Handle a clean tap (pointer moved < threshold)
+function handleTap(uid, cx, cy) {
+  try {
+    if (uid === '__canvas__') {
+      if (state.selectedId) {
+        const cell = clientToGrid(cx, cy);
+        handleGridTap(cell.col, cell.row);
+      }
+      return;
+    }
+    if (state.placedCargo.has(uid)) selectPlacedCargo(uid);
+    else                             selectCargo(uid);
+  } catch (err) {
+    console.warn('handleTap error:', err);
+  }
+}
+
+// Unload via drag-to-manifest
+function doUnload(uid) {
+  try {
+    state.selectedId = uid;
+    unloadSelected();
+  } catch (err) {
+    console.warn('doUnload error:', err);
+    renderContainer();
+  }
+}
+
+// doPlaceCargo kept for handleGridTap compatibility
+function doPlaceCargo(uid, col, row) {
+  if (!tryPlace(uid, col, row)) {
+    playSound('error');
+    showToast("CAN'T FIT HERE");
+    renderContainer();
+  }
+}
+
+// Legacy stub
+let hoverCell = { col: -1, row: -1 };
+
+function handleGridTap(col, row) {
+  if (col < 0 || col >= state.COLS || row < 0 || row >= state.ROWS) return;
+
+  if (state.selectedId) {
+    const isAlreadyPlaced = state.placedCargo.has(state.selectedId);
+
+    // Tapping the same cell as the selected-placed cargo = unload it
+    if (isAlreadyPlaced && state.grid[row][col] === state.selectedId) {
+      unloadSelected();
+      return;
+    }
+
+    // Tapping a different placed cargo while a manifest item is selected = switch selection
+    const tappedUid = state.grid[row][col];
+    if (!isAlreadyPlaced && tappedUid) {
+      state.selectedId = tappedUid;
+      updateUnloadButton();
+      updateContainerLabel();
+      renderManifest();
+      renderContainer();
+      return;
+    }
+
+    doPlaceCargo(state.selectedId, col, row);
+  } else {
+    const uid = state.grid[row][col];
+    if (uid) selectPlacedCargo(uid);
+  }
+}
+
+function updateUnloadButton() {
+  const isPlaced = !!(state.selectedId && state.placedCargo.has(state.selectedId));
+  $('unload-btn').classList.toggle('visible', isPlaced);
+  // CANCEL is visible whenever anything is selected (placed or unplaced)
+  const hasSelection = !!(state.selectedId) || drag.pending || drag.active;
+  $('cancel-btn').classList.toggle('visible', hasSelection);
+}
+
+// Cancel the current selection or in-progress drag without changing the load.
+// - If dragging: abort the drag, return cargo to where it was (grid or manifest).
+// - If a manifest item is selected but not placed: just deselect it.
+// - If a placed cargo is selected: deselect it (it stays in the container).
+// No penalties, no load changes.
+function cancelSelection() {
+  try {
+    fullDragCleanup();           // aborts any in-flight drag, hides ghost
+    state.selectedId = null;
+    updateUnloadButton();        // hides both cancel + unload buttons
+    updateContainerLabel();
+    renderManifest();
+    renderContainer();
+  } catch (err) {
+    console.warn('cancelSelection error:', err);
+  }
+}
+
+function checkQoLWarnings() {
+  const total = state.COLS * state.ROWS;
+  let used = 0;
+  state.cargo.forEach(c => {
+    if (!state.placedCargo.has(c.uid)) return;
+    const rot = state.rotationState[c.uid] || 0;
+    used += (rot ? c.h : c.w) * (rot ? c.w : c.h);
+  });
+  const pct = used / total;
+  const unplacedCount = state.cargo.filter(c => !state.placedCargo.has(c.uid)).length;
+  if (pct > 0.85 && unplacedCount > 0) {
+    showToast('⚠ LIMITED SPACE REMAINING', 1200);
+  }
+  const issueMap = analyseLoad();
+  let crushCount = Object.values(issueMap).filter(i => i.crushed).length;
+  let dgCount    = Object.values(issueMap).filter(i => i.dgConflict).length;
+  if (crushCount > 0 && Math.random() < 0.4) showToast('⚠ FRAGILE CARGO AT RISK', 1000);
+  if (dgCount    > 0) showToast('⚠ DG SEPARATION RISK', 1400);
+}
+
+// ================================================================
+// CONTROLS
+// ================================================================
+
+function rotateSelected() {
+  if (!state.selectedId) {
+    showToast('SELECT CARGO FIRST');
+    return;
+  }
+  const uid = state.selectedId;
+  const cargo = state.cargo.find(c => c.uid === uid);
+  const wasPlaced = state.placedCargo.has(uid);
+  let col = -1, row = -1;
+  if (wasPlaced) {
+    outer:for (let r = 0; r < state.ROWS; r++)
+      for (let c = 0; c < state.COLS; c++)
+        if (state.grid[r][c] === uid) { col = c; row = r; break outer; }
+    removeCargo(uid);
+  }
+
+  state.rotationState[uid] = (state.rotationState[uid] || 0) === 0 ? 1 : 0;
+  playSound('rotate');
+
+  if (wasPlaced) {
+    const rot = state.rotationState[uid];
+    const cw = rot ? cargo.h : cargo.w;
+    const ch = rot ? cargo.w : cargo.h;
+    if (!placeCargo(uid, col, row)) {
+      // Try to re-place, revert if can't
+      state.rotationState[uid] = state.rotationState[uid] === 0 ? 1 : 0;
+      placeCargo(uid, col, row);
+      showToast("CAN'T ROTATE HERE");
+    }
+  }
+
+  renderManifest();
+  renderContainer(drag.hoverCol >= 0 ? drag.hoverCol : undefined,
+                  drag.hoverRow >= 0 ? drag.hoverRow : undefined);
+  updateStatusBars();
+  updateUnloadButton();
+  updateContainerLabel();
+}
+
+function clearContainer() {
+  fullDragCleanup();
+  state.grid = Array.from({length: state.ROWS}, () => Array(state.COLS).fill(null));
+  state.placedCargo = new Set();
+  state.selectedId = null;
+  state.reworkCount = 0;
+  state.reworkPenalty = 0;
+  $('hud-rework-val').textContent = '0';
+  updateUnloadButton();
+  updateContainerLabel();
+  renderManifest();
+  renderContainer();
+  updateStatusBars();
+  showToast('CONTAINER CLEARED');
+}
+
+// ================================================================
+// UNLOAD / REWORK
+// ================================================================
+
+function unloadSelected() {
+  if (!state.selectedId) return;
+  const uid = state.selectedId;
+  if (!state.placedCargo.has(uid)) return;
+
+  const cargo = state.cargo.find(c => c.uid === uid);
+
+  // Remove from grid
+  removeCargo(uid);
+  state.selectedId = null;
+
+  // Penalty curve: first 2 unloads free (grace), then $100 escalating by $75 each, capped at $500
+  let penalty = 0;
+  if (state.reworkCount >= 2) {
+    penalty = Math.min(500, 100 + (state.reworkCount - 2) * 75);
+  }
+  state.reworkCount++;
+  state.reworkPenalty += penalty;
+  $('hud-rework-val').textContent = state.reworkCount;
+
+  // Flash score display
+  const scoreEl = $('hud-score');
+  scoreEl.classList.remove('penalty-flash');
+  void scoreEl.offsetWidth;
+  scoreEl.classList.add('penalty-flash');
+
+  playSound('rotate');
+  if (penalty > 0) {
+    showToast(`REWORK -$${penalty}`, 900);
+  } else {
+    showToast('CARGO UNLOADED', 700);
+  }
+
+  updateUnloadButton();
+  updateContainerLabel();
+  renderManifest();
+  renderContainer();
+  updateStatusBars();
+}
+
+// ================================================================
+// STATUS BARS
+// ================================================================
+
+function updateStatusBars() {
+  reconcilePlacedCargo();
+  const total = state.COLS * state.ROWS;
+  let used = 0;
+  state.cargo.forEach(c => {
+    if (!state.placedCargo.has(c.uid)) return;
+    const rot = state.rotationState[c.uid] || 0;
+    used += (rot ? c.h : c.w) * (rot ? c.w : c.h);
+  });
+  const spacePct = Math.round((used / total) * 100);
+
+  const issueMap = state.placedCargo.size > 0 ? analyseLoad() : {};
+
+  // Crush risk: count crushed fragile + unstable drums
+  let crushCount = 0, floatCount = 0, drumCount = 0;
+  Object.values(issueMap).forEach(iss => {
+    if (iss.crushed) crushCount++;
+    if (iss.unsupported) floatCount++;
+    if (iss.unstableDrum) drumCount++;
+  });
+  const totalPlaced = state.placedCargo.size || 1;
+  const crushPct = Math.min(100, (crushCount * 50) + (drumCount * 20));
+
+  // Balance: weight-class-weighted left/right distribution
+  let leftW = 0, rightW = 0;
+  const mid = state.COLS / 2;
+  state.cargo.forEach(cargo => {
+    if (!state.placedCargo.has(cargo.uid)) return;
+    const wt = cargo.weightClass === 'H' ? 8 : cargo.weightClass === 'L' ? 1 : 3;
+    outer:for (let r = 0; r < state.ROWS; r++) {
+      for (let c = 0; c < state.COLS; c++) {
+        if (state.grid[r][c] === cargo.uid) {
+          const rot = state.rotationState[cargo.uid] || 0;
+          const cw = rot ? cargo.h : cargo.w;
+          const centre = c + cw / 2;
+          if (centre < mid) leftW += wt; else rightW += wt;
+          break outer;
+        }
+      }
+    }
+  });
+  const totalW = leftW + rightW || 1;
+  const imbalance = Math.abs(0.5 - leftW / totalW) * 2; // 0=perfect, 1=all one side
+  const balanceScore = Math.round((1 - imbalance) * 100);
+
+  // Stability = penalise floating + imbalance + drum instability
+  const floatPenalty = Math.min(80, floatCount * 30);
+  const stabPct = Math.max(0, Math.round(balanceScore - floatPenalty - (drumCount * 15) - crushCount * 10));
+
+  setBar('bar-space', spacePct, spacePct > 70 ? 'var(--green)' : spacePct > 40 ? 'var(--orange)' : 'var(--text2)');
+  setBar('bar-crush', crushPct, crushPct > 50 ? 'var(--red)' : crushPct > 20 ? 'var(--orange)' : 'var(--green)');
+  setBar('bar-balance', balanceScore, balanceScore > 70 ? 'var(--green)' : balanceScore > 40 ? 'var(--orange)' : 'var(--red)');
+  setBar('bar-stability', stabPct, stabPct > 70 ? 'var(--green)' : stabPct > 40 ? 'var(--orange)' : 'var(--red)');
+}
+
+function setBar(id, pct, color) {
+  const el = $(id);
+  el.style.width = pct + '%';
+  el.style.background = color;
+}
+
+// ================================================================
+// SHIP MODAL STATE
+// ================================================================
+let pendingShipIssueMap = null;
+
+// ================================================================
+// ADDITIONAL CARGO SYSTEM
+// ================================================================
+
+// Per-type minimum free cells before we bother evaluating.
+// These are intentionally low — the generator is the real gate.
+const ADDCARGO_MIN_CELLS = {
+  retail:    2,
+  offshore:  3,
+  dangerous: 2,
+  heavy:     4,
+  relief:    2,
+};
+const ADDCARGO_MIN_CELLS_DEFAULT = 3;
+
+// ── evaluateAdditionalCargoOpportunity ────────────────────────────
+// Single authoritative function that decides whether to offer extra cargo.
+// Does NOT use utilisation % as a gate — only real-grid fit checks.
+function evaluateAdditionalCargoOpportunity() {
+  if (state.additionalCargoOffered) return false;
+
+  reconcilePlacedCargo();
+
+  // Count free cells directly from the grid (ground truth)
+  let freeCells = 0;
+  for (let r = 0; r < state.ROWS; r++)
+    for (let c = 0; c < state.COLS; c++)
+      if (!state.grid[r]?.[c]) freeCells++;
+
+  const typeId  = state.shipmentType?.id || '';
+  const minCells = ADDCARGO_MIN_CELLS[typeId] ?? ADDCARGO_MIN_CELLS_DEFAULT;
+  if (freeCells < minCells) return false;
+
+  // Try to generate fitting cargo — this is the ONLY gate
+  const extra = buildAdditionalCargoSet(freeCells);
+  if (!extra || extra.length === 0) return false;
+
+  // Found at least one valid item — populate and show the modal
+  state._pendingExtraCargo = extra;
+  state.additionalCargoOffered = true;
+
+  const total   = state.COLS * state.ROWS;
+  const effPct  = Math.round(((total - freeCells) / total) * 100);
+  $('addcargo-pct').textContent = `${effPct}% utilised · ${freeCells} cells free`;
+
+  const totalValue = extra.reduce((s, c) => s + c.value, 0);
+  $('addcargo-potential').textContent =
+    `Potential Additional Revenue: +$${totalValue.toLocaleString()}`;
+
+  $('addcargo-items').innerHTML = extra.map(c => `
+    <div class="addcargo-item">
+      <span class="addcargo-item-icon">${c.icon}</span>
+      <div class="addcargo-item-info">
+        <div>${c.label} <span style="color:var(--text3);font-size:10px">${c.w}×${c.h}</span></div>
+      </div>
+      <div class="addcargo-item-value">+$${c.value.toLocaleString()}</div>
+    </div>
+  `).join('');
+
+  $('addcargo-overlay').classList.add('show');
+  return true;
+}
+
+// ── buildAdditionalCargoSet ────────────────────────────────────────
+// Tries to pack 1–3 items into the remaining grid space.
+// Uses three candidate pools in priority order:
+//   1. Themed pool (matches shipment type) — authentic feel
+//   2. Generic pool (all types) — fallback when themed pool yields nothing
+//   3. Smallest-fit-first — last resort to guarantee a result if any space exists
+function buildAdditionalCargoSet(freeCells) {
+  // ── Grid helpers ───────────────────────────────────────────────
+  const trialGrid = Array.from({length: state.ROWS}, (_, r) =>
+    Array.from({length: state.COLS}, (_, c) => state.grid[r]?.[c] || null)
+  );
+
+  function canFit(g, col, row, w, h) {
+    if (col < 0 || row < 0 || col + w > state.COLS || row + h > state.ROWS) return false;
+    for (let r = row; r < row + h; r++)
+      for (let c = col; c < col + w; c++)
+        if (g[r][c]) return false;
+    return true;
+  }
+  // Scan entire grid, top-down AND bottom-up, to find ANY slot for w×h
+  function findAnySlot(g, w, h) {
+    // Bottom-up first (prefers floor — matches player instinct)
+    for (let row = state.ROWS - h; row >= 0; row--)
+      for (let col = 0; col <= state.COLS - w; col++)
+        if (canFit(g, col, row, w, h)) return { col, row };
+    return null;
+  }
+  function placeIn(g, col, row, w, h, uid) {
+    for (let r = row; r < row + h; r++)
+      for (let c = col; c < col + w; c++)
+        g[r][c] = uid;
+  }
+
+  // Try to place a single template in the trial grid (both orientations)
+  function tryPlace(tpl) {
+    const variants = [{ w: tpl.w, h: tpl.h }, { w: tpl.h, h: tpl.w }];
+    for (const v of variants) {
+      if (v.w === tpl.w && v.h === tpl.h && variants.length > 1 &&
+          v.w === variants[1].w && v.h === variants[1].h) continue; // skip dup
+      const slot = findAnySlot(trialGrid, v.w, v.h);
+      if (slot) {
+        placeIn(trialGrid, slot.col, slot.row, v.w, v.h, '__extra__');
+        return { ...tpl, uid: newUid('extra'), rotation: 0, isAdditional: true };
+      }
+    }
+    return null;
+  }
+
+  function shuffle(a) { return a.slice().sort(() => Math.random() - 0.5); }
+
+  // ── Build candidate pools ─────────────────────────────────────
+  const stype = state.shipmentType;
+
+  // All types that have any chance of fitting (area check is just a fast pre-filter)
+  const allFitting = CARGO_TYPES.filter(ct => {
+    const minDim = Math.min(ct.w, ct.h);
+    const maxDim = Math.max(ct.w, ct.h);
+    // Must be able to fit in at least one orientation given free cells
+    if (Math.min(ct.w * ct.h, ct.h * ct.w) > freeCells) return false;
+    // Must fit within grid dimensions
+    if (minDim > state.ROWS || maxDim > state.COLS) return false;
+    if (minDim > state.COLS || maxDim > state.ROWS) return false;
+    return true;
+  });
+
+  // Pool 1: themed — matches current shipment type's filter
+  const themed = allFitting.filter(ct =>
+    !stype?.poolFilter || stype.poolFilter(ct)
+  );
+
+  // Pool 2: include small cargo (area ≥ 1) that was excluded by themed pool,
+  //         as common fillers (pallet, crate, smallbox always allowed)
+  const fillerIds = new Set(['pallet', 'crate', 'smallbox', 'barrel', 'pipe']);
+  const fillers   = allFitting.filter(ct => fillerIds.has(ct.id));
+
+  // ── Attempt placement ────────────────────────────────────────
+  const chosen  = [];
+  const maxItems = Math.min(3, Math.max(1, Math.ceil(freeCells / 3)));
+
+  // Pass 1: try themed candidates
+  for (const tpl of shuffle(themed)) {
+    if (chosen.length >= maxItems) break;
+    const result = tryPlace(tpl);
+    if (result) chosen.push(result);
+  }
+
+  // Pass 2: if nothing found yet, try generic fillers (ensures we always find something)
+  if (chosen.length === 0) {
+    for (const tpl of shuffle(fillers)) {
+      if (chosen.length >= maxItems) break;
+      const result = tryPlace(tpl);
+      if (result) chosen.push(result);
+    }
+  }
+
+  // Pass 3: absolute last resort — try every remaining type sorted by smallest area first
+  if (chosen.length === 0) {
+    const sortedAll = allFitting.slice().sort((a, b) => (a.w * a.h) - (b.w * b.h));
+    for (const tpl of sortedAll) {
+      const result = tryPlace(tpl);
+      if (result) { chosen.push(result); break; }
+    }
+  }
+
+  return chosen;
+}
+
+// ── checkAdditionalCargoOpportunity ───────────────────────────────
+// Called from shipLoad — delegates entirely to evaluateAdditionalCargoOpportunity.
+function checkAdditionalCargoOpportunity() {
+  return evaluateAdditionalCargoOpportunity();
+}
+
+// Legacy alias used by older code paths
+function generateAdditionalCargo(freeCells) {
+  return buildAdditionalCargoSet(freeCells);
+}
+
+function acceptAdditionalCargo() {
+  $('addcargo-overlay').classList.remove('show');
+  const extra = state._pendingExtraCargo || [];
+  if (extra.length === 0) { proceedToShipCheck(); return; }
+
+  // Set penalty: base $1500 + 30% of each extra item's value (escalating commitment)
+  const penaltyBase = 1500;
+  const penaltyPerItem = extra.reduce((s, c) => s + Math.round(c.value * 0.3), 0);
+  state.additionalCargoRejectionPenalty = penaltyBase + penaltyPerItem;
+  state.additionalCargoAccepted = true;
+
+  // Add extra items to the manifest
+  extra.forEach(c => {
+    state.cargo.push(c);
+    state.rotationState[c.uid] = 0;
+  });
+  state._pendingExtraCargo = null;
+
+  // Resume timer if running, return to loading
+  resumeTimerIfActive();
+  renderManifest();
+  renderContainer();
+  updateStatusBars();
+  updateManifestArrows();
+  showToast('ADDITIONAL CARGO ACCEPTED — REWORK IF NEEDED', 2000);
+}
+
+function declineAdditionalCargo() {
+  $('addcargo-overlay').classList.remove('show');
+  state._pendingExtraCargo = null;
+  // Proceed to normal ship check (all manifest cargo already loaded)
+  proceedToShipCheck();
+}
+
+// The normal ship path after the additional-cargo intercept is resolved
+function proceedToShipCheck() {
+  const issueMap = state.placedCargo.size > 0 ? analyseLoad() : {};
+  const problems  = buildRiskReport(issueMap);
+  if (problems.length > 0) {
+    pendingShipIssueMap = issueMap;
+    const issEl = $('risk-issues');
+    issEl.innerHTML = problems.map(p =>
+      `<div class="risk-issue ${p.critical?'critical':''}">
+        <span class="risk-issue-icon">${p.icon}</span>
+        <span>${p.text}</span>
+      </div>`
+    ).join('');
+    $('risk-overlay').classList.add('show');
+  } else {
+    pendingShipIssueMap = issueMap;
+    executeShip(issueMap, false, false);
+  }
+}
+
+function shipLoad() {
+  fullDragCleanup();
+  clearInterval(state.timerInterval);
+
+  reconcilePlacedCargo();
+
+  const unloadedCargo = state.cargo.filter(c => !state.placedCargo.has(c.uid));
+
+  // If cargo left behind — show overbooked modal FIRST
+  if (unloadedCargo.length > 0) {
+    const unloadedValue = unloadedCargo.reduce((s, c) => s + c.value, 0);
+    $('overbooked-unloaded-text').textContent =
+      `${unloadedCargo.length} item${unloadedCargo.length > 1 ? 's' : ''} left behind · $${unloadedValue.toLocaleString()} at risk`;
+    $('overbooked-overlay').classList.add('show');
+    return;
+  }
+
+  // All manifest cargo loaded — check for additional cargo opportunity
+  // (only offer once, and only when space allows)
+  if (checkAdditionalCargoOpportunity()) return; // intercepted
+
+  // No additional cargo offered (or already offered) — proceed to quality check
+  proceedToShipCheck();
+}
+
+function overbookedRework() {
+  $('overbooked-overlay').classList.remove('show');
+  resumeTimerIfActive();
+}
+
+function overbookedShip() {
+  $('overbooked-overlay').classList.remove('show');
+  reconcilePlacedCargo();
+  const issueMap = state.placedCargo.size > 0 ? analyseLoad() : {};
+  executeShip(issueMap, false, true); // isOverbooked=true
+}
+
+function reworkLoad() {
+  $('risk-overlay').classList.remove('show');
+  resumeTimerIfActive();
+}
+
+function shipAnyway() {
+  $('risk-overlay').classList.remove('show');
+  reconcilePlacedCargo();
+  executeShip(pendingShipIssueMap, true, false);
+}
+
+function executeShip(issueMap, forcedShip, isOverbooked) {
+  playSound('ship');
+  reconcilePlacedCargo(); // final authoritative reconciliation before scoring
+
+  const total = state.COLS * state.ROWS;
+  let used = 0;
+  let cargoValue = 0;
+  let crushDamage = 0;
+  let floatDamage = 0;
+  let drumDamage  = 0;
+  let dgPenalty   = 0;
+
+  state.cargo.forEach(cargo => {
+    if (!state.placedCargo.has(cargo.uid)) return;
+    const rot = state.rotationState[cargo.uid] || 0;
+    const cw = rot ? cargo.h : cargo.w;
+    const ch = rot ? cargo.w : cargo.h;
+    used += cw * ch;
+    cargoValue += cargo.value;
+
+    const iss = issueMap ? (issueMap[cargo.uid] || {}) : {};
+    if (iss.crushed)      crushDamage += cargo.value * 0.75;
+    if (iss.unsupported)  floatDamage += cargo.value * 0.5;
+    if (iss.unstableDrum) drumDamage  += cargo.value * 0.3;
+    if (iss.dgConflict)   dgPenalty   += cargo.value * 0.4; // 40% of each conflicting item
+  });
+
+  const spacePct = used / total;
+  const unloadedCargo = state.cargo.filter(c => !state.placedCargo.has(c.uid));
+  const unloadedValue = unloadedCargo.reduce((s, c) => s + c.value, 0);
+
+  // Space bonus: high reward for dense loading (scales 0→7000)
+  const spaceBonus = Math.round(spacePct * spacePct * 7000); // squared — rewards density more
+
+  // Fast turnaround bonus: % of loaded cargo revenue, scaled by time remaining fraction.
+  // Only applies when: mode has a cut-off, player shipped before it fired, no delays used.
+  const hasCutoff = state.cfg.cutoffTime > 0;
+  const pctLeft   = hasCutoff ? (state.timeLeft / state.timeTotal) : 0;
+  let fastBonusPct = 0;
+  if (hasCutoff && !state.cutoffReached && state.delayCount === 0) {
+    if      (pctLeft >= 0.75) fastBonusPct = 0.20;
+    else if (pctLeft >= 0.50) fastBonusPct = 0.12;
+    else if (pctLeft >= 0.25) fastBonusPct = 0.06;
+    // else: < 0.25 remaining → 0%
+  }
+  const fastBonus = Math.round(cargoValue * fastBonusPct);
+
+  const speedBonus  = 0; // retired — replaced by fastBonus
+  const crushLoss   = Math.round(crushDamage);
+  const floatLoss   = Math.round(floatDamage);
+  const drumLoss    = Math.round(drumDamage);
+  const dgLoss      = Math.round(dgPenalty);
+  const unloadedLoss  = Math.round(unloadedValue * 0.8);
+  const emptySpaceLoss = isOverbooked ? Math.round((1 - spacePct) * 3000) : 0;
+  const forcePenalty  = forcedShip ? Math.round((crushLoss + floatLoss) * 0.25) : 0;
+  const reworkLoss    = state.reworkPenalty;
+  const delayCost     = state.delayCostTotal;
+
+  // Additional cargo rejection penalty: fires when player accepted extra cargo
+  // but didn't load all of it — terminal rehandling cost
+  const extraUnloaded = state.additionalCargoAccepted
+    ? state.cargo.filter(c => c.isAdditional && !state.placedCargo.has(c.uid)).length
+    : 0;
+  const rejectionPenalty = (state.additionalCargoAccepted && extraUnloaded > 0)
+    ? state.additionalCargoRejectionPenalty : 0;
+
+  // Declare maximisedLoad and maximisedBonus BEFORE they are used in the net formula
+  const maximisedLoad  = state.additionalCargoAccepted && extraUnloaded === 0;
+  const maximisedBonus = maximisedLoad ? 3000 : 0;
+
+  const net = Math.max(0, cargoValue + spaceBonus + fastBonus + maximisedBonus
+    - crushLoss - floatLoss - drumLoss - dgLoss
+    - unloadedLoss - emptySpaceLoss - forcePenalty - reworkLoss - delayCost - rejectionPenalty);
+
+  const isPerfect = unloadedCargo.length === 0 && crushDamage === 0
+    && floatDamage === 0 && drumDamage === 0 && dgPenalty === 0
+    && reworkLoss === 0 && delayCost === 0 && spacePct > 0.85;
+  const isGood = net > 4000 || spacePct > 0.70;
+  const isOk   = net > 2000;
+
+  setTimeout(() => {
+    if (isPerfect) showPerfectAnimation(() => showScoreScreen(
+      net, cargoValue, spaceBonus, fastBonus,
+      crushLoss, floatLoss, drumLoss, dgLoss,
+      unloadedLoss, emptySpaceLoss, forcePenalty, reworkLoss, delayCost, rejectionPenalty,
+      unloadedCargo, isOverbooked, isPerfect, isGood, isOk, spacePct, maximisedLoad));
+    else showScoreScreen(
+      net, cargoValue, spaceBonus, fastBonus,
+      crushLoss, floatLoss, drumLoss, dgLoss,
+      unloadedLoss, emptySpaceLoss, forcePenalty, reworkLoss, delayCost, rejectionPenalty,
+      unloadedCargo, isOverbooked, isPerfect, isGood, isOk, spacePct, maximisedLoad);
+  }, 300);
+}
+
+function showPerfectAnimation(cb) {
+  playSound('perfect');
+  const overlay = $('perfect-overlay');
+  overlay.classList.add('show');
+  setTimeout(() => {
+    overlay.classList.remove('show');
+    cb();
+  }, 2500);
+}
+
+function showScoreScreen(net, cargoVal, spaceBonus, fastBonus,
+    crushLoss, floatLoss, drumLoss, dgLoss,
+    unloadedLoss, emptySpaceLoss, forcePenalty, reworkLoss, delayCost, rejectionPenalty,
+    unloadedCargo, isOverbooked, isPerfect, isGood, isOk, spacePct, maximisedLoad) {
+
+  // ── Defensive defaults — ensure nothing is undefined ────────────
+  const safeNet          = Number.isFinite(net)          ? net          : 0;
+  const safeCargoVal     = Number.isFinite(cargoVal)     ? cargoVal     : 0;
+  const safeSpaceBonus   = Number.isFinite(spaceBonus)   ? spaceBonus   : 0;
+  const safeFastBonus    = Number.isFinite(fastBonus)    ? fastBonus    : 0;
+  const safeCrushLoss    = Number.isFinite(crushLoss)    ? crushLoss    : 0;
+  const safeFloatLoss    = Number.isFinite(floatLoss)    ? floatLoss    : 0;
+  const safeDrumLoss     = Number.isFinite(drumLoss)     ? drumLoss     : 0;
+  const safeDGLoss       = Number.isFinite(dgLoss)       ? dgLoss       : 0;
+  const safeUnloadedLoss = Number.isFinite(unloadedLoss) ? unloadedLoss : 0;
+  const safeEmptyLoss    = Number.isFinite(emptySpaceLoss) ? emptySpaceLoss : 0;
+  const safeForce        = Number.isFinite(forcePenalty) ? forcePenalty : 0;
+  const safeRework       = Number.isFinite(reworkLoss)   ? reworkLoss   : 0;
+  const safeDelay        = Number.isFinite(delayCost)    ? delayCost    : 0;
+  const safeRejection    = Number.isFinite(rejectionPenalty) ? rejectionPenalty : 0;
+  const safeSpacePct     = Number.isFinite(spacePct)     ? spacePct     : 0;
+  const safeUnloaded     = Array.isArray(unloadedCargo)  ? unloadedCargo : [];
+  const unloadedCount    = safeUnloaded.length;
+
+  // ── Grade — computed FIRST, before any reference to gradeKey ────
+  let gradeKey;
+  try {
+    gradeKey = computeGrade(safeNet, safeSpacePct, safeCrushLoss, safeFloatLoss,
+      safeDrumLoss, unloadedCount, safeDelay, safeRework, safeDGLoss);
+  } catch (err) {
+    console.warn('computeGrade error:', err);
+    gradeKey = 'C'; // safe fallback
+  }
+  const gradeData = GRADE_DATA[gradeKey] || GRADE_DATA['C'];
+  const subtitles = Array.isArray(gradeData.subtitles) && gradeData.subtitles.length
+    ? gradeData.subtitles
+    : ['Shipment processed.'];
+  const gradeSub = subtitles[Math.floor(Math.random() * subtitles.length)];
+
+  // ── Sound — gradeKey is now safely initialised ──────────────────
+  if (gradeKey === 'S') playSound('perfect');
+  else playSound('score');
+
+  // ── Grade display ────────────────────────────────────────────────
+  const gradeLetterEl = $('grade-letter');
+  if (gradeLetterEl) {
+    gradeLetterEl.textContent = gradeKey;
+    gradeLetterEl.className   = `grade-letter ${gradeKey}`;
+    gradeLetterEl.style.animation = 'none';
+    void gradeLetterEl.offsetWidth;
+    gradeLetterEl.style.animation = '';
+  }
+  if ($('grade-title'))    $('grade-title').textContent    = (gradeData.title || gradeKey).toUpperCase();
+  if ($('grade-subtitle')) $('grade-subtitle').textContent = gradeSub;
+  if ($('grade-shipment-tag')) {
+    const identity = getShipmentIdentity();
+    $('grade-shipment-tag').textContent = `◆ ${identity.tag}`;
+  }
+
+  if ($('score-net')) $('score-net').textContent = safeNet.toLocaleString();
+  if ($('score-round-info')) {
+    const identity = getShipmentIdentity();
+    const ltLabel  = state.loadType === 'fcl' ? 'FCL' : 'LCL';
+    $('score-round-info').textContent =
+      `ROUND ${state.round} · ${(state.cfg?.name || '').toUpperCase()} · ${ltLabel} · TOTAL: $${state.totalScore.toLocaleString()}`;
+  }
+
+  // ── Breakdown rows ───────────────────────────────────────────────
+  const breakdown = $('score-breakdown');
+  const rows = [
+    ['Cargo loaded',           `+$${safeCargoVal.toLocaleString()}`,   'pos'],
+    ['Space efficiency bonus', `+$${safeSpaceBonus.toLocaleString()}`, 'pos'],
+  ];
+  if (safeFastBonus > 0)    rows.push(['Fast turnaround bonus',        `+$${safeFastBonus.toLocaleString()}`,    'pos']);
+  if (safeCrushLoss > 0)    rows.push(['Fragile cargo crushed',        `-$${safeCrushLoss.toLocaleString()}`,    'neg']);
+  if (safeFloatLoss > 0)    rows.push(['Unsupported cargo damage',     `-$${safeFloatLoss.toLocaleString()}`,    'neg']);
+  if (safeDrumLoss > 0)     rows.push(['Unstable drums',               `-$${safeDrumLoss.toLocaleString()}`,     'neg']);
+  if (safeDGLoss > 0)       rows.push(['DG separation penalty',         `-$${safeDGLoss.toLocaleString()}`,      'neg']);
+  if (safeUnloadedLoss > 0) rows.push([`${unloadedCount} cargo left behind`, `-$${safeUnloadedLoss.toLocaleString()}`, 'neg']);
+  if (safeEmptyLoss > 0)    rows.push(['Unused container space',       `-$${safeEmptyLoss.toLocaleString()}`,   'neg']);
+  if (safeForce > 0)        rows.push(['Shipped with known risks',     `-$${safeForce.toLocaleString()}`,       'neg']);
+  if (safeRework > 0)       rows.push([`Rework ops (${state.reworkCount ?? 0}×)`, `-$${safeRework.toLocaleString()}`, 'neg']);
+  if (safeDelay > 0)        rows.push([`Vessel delay (${state.delayCount ?? 0}×)`, `-$${safeDelay.toLocaleString()}`, 'neg']);
+  if (safeRejection > 0)   rows.push(['Terminal rehandling cost',     `-$${safeRejection.toLocaleString()}`,  'neg']);
+  if (maximisedLoad)        rows.push(['Full utilisation bonus',        '+$3,000',                             'pos']);
+  if (isPerfect)            rows.push(['PERFECT LOAD BONUS',           '+$5,000',                              'pos']);
+  rows.push(['NET REVENUE', `$${safeNet.toLocaleString()}`, '']);
+
+  // Maximised load banner
+  const banner = $('max-load-banner');
+  if (banner) {
+    if (maximisedLoad) {
+      const subs = [
+        'Terminal capacity optimised. Well done.',
+        'Every cubic metre accounted for.',
+        'The terminal manager is quietly impressed.',
+        'Outstanding load efficiency. Noted.',
+      ];
+      $('max-load-sub').textContent = subs[Math.floor(Math.random() * subs.length)];
+      banner.style.display = 'flex';
+    } else {
+      banner.style.display = 'none';
+    }
+  }
+
+  if (breakdown) {
+    breakdown.innerHTML = rows.map((r, i) => `
+      <div class="score-row ${i === rows.length - 1 ? 'total' : ''}">
+        <span class="score-row-label">${r[0]}</span>
+        <span class="score-row-val ${r[2]}">${r[1]}</span>
+      </div>
+    `).join('');
+  }
+
+  // ── PLAYER'S CONTAINER SNAPSHOT ────────────────────────────────
+  const sc = $('score-canvas');
+  const maxW = Math.min(window.innerWidth - 56, 380);
+  const snapCell = Math.floor(maxW / state.COLS);
+  sc.width  = snapCell * state.COLS + 20;
+  sc.height = snapCell * state.ROWS + 20;
+  sc.style.height = sc.height + 'px';
+
+  const savedCell = state.CELL;
+  state.CELL = snapCell;
+  const sctx = sc.getContext('2d');
+  const PAD = 10;
+  sctx.fillStyle = '#0d1420'; sctx.strokeStyle = '#2a3448'; sctx.lineWidth = 2;
+  roundRectCtx(sctx, 0, 0, sc.width, sc.height, 4, true, true);
+  const snapIssues = state.placedCargo.size > 0 ? analyseLoad() : {};
+  state.cargo.forEach(cargo => {
+    if (!state.placedCargo.has(cargo.uid)) return;
+    const rot = state.rotationState[cargo.uid] || 0;
+    const cw = rot ? cargo.h : cargo.w;
+    const ch = rot ? cargo.w : cargo.h;
+    let px = -1, py = -1;
+    outer:for (let r = 0; r < state.ROWS; r++) {
+      for (let c = 0; c < state.COLS; c++) {
+        if (state.grid[r][c] === cargo.uid) { py = r; px = c; break outer; }
+      }
+    }
+    if (px === -1) return;
+    drawCargo(sctx, cargo, px, py, cw, ch, PAD, snapCell, false, snapIssues[cargo.uid]);
+  });
+  state.CELL = savedCell;
+
+  // ── OPTIMAL LAYOUT REVEAL ───────────────────────────────────────
+  const revealEl = $('optimal-reveal');
+  const revealSub = $('optimal-reveal-sub');
+  if (isOverbooked && state.optimalLayout.length > 0) {
+    revealEl.style.display = 'block';
+    const optCell = snapCell;
+    const oc = $('optimal-canvas');
+    oc.width  = optCell * state.COLS + 20;
+    oc.height = optCell * state.ROWS + 20;
+    oc.style.height = oc.height + 'px';
+
+    const octx = oc.getContext('2d');
+    octx.fillStyle = '#0d1420'; octx.strokeStyle = '#2a3448'; octx.lineWidth = 2;
+    roundRectCtx(octx, 0, 0, oc.width, oc.height, 4, true, true);
+
+    // Draw each cargo in its optimal position
+    const placedInOptimal = new Set(state.optimalLayout.map(p => p.uid));
+    revealSub.textContent = placedInOptimal.size === state.cargo.length
+      ? `All ${state.cargo.length} items fit with an optimal loading plan.`
+      : `${placedInOptimal.size} of ${state.cargo.length} items fit — tighter than you loaded.`;
+
+    state.optimalLayout.forEach(entry => {
+      const cargo = state.cargo.find(c => c.uid === entry.uid);
+      if (!cargo) return;
+      const rot = entry.rot;
+      const cw = rot ? cargo.h : cargo.w;
+      const ch = rot ? cargo.w : cargo.h;
+      // Draw slightly faded to distinguish from player's load
+      octx.globalAlpha = 0.85;
+      drawCargo(octx, cargo, entry.col, entry.row, cw, ch, PAD, optCell, false, null);
+      octx.globalAlpha = 1;
+    });
+    // Overlay cyan "optimal" label
+    octx.fillStyle = 'rgba(32,212,224,0.08)';
+    roundRectCtx(octx, 0, 0, oc.width, oc.height, 4, true, false);
+  } else {
+    revealEl.style.display = 'none';
+  }
+
+  const hs = parseInt(localStorage.getItem('cs_hs') || '0');
+  if (state.totalScore > hs) {
+    localStorage.setItem('cs_hs', state.totalScore);
+    updateHSDisplay();
+  }
+
+  showScreen('screen-score');
+}
+
+function roundRectCtx(ctx, x, y, w, h, r, fill, stroke) {
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y);
+  ctx.quadraticCurveTo(x+w,y,x+w,y+r); ctx.lineTo(x+w,y+h-r);
+  ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h); ctx.lineTo(x+r,y+h);
+  ctx.quadraticCurveTo(x,y+h,x,y+h-r); ctx.lineTo(x,y+r);
+  ctx.quadraticCurveTo(x,y,x+r,y); ctx.closePath();
+  if (fill) ctx.fill();
+  if (stroke) ctx.stroke();
+}
+
+function goTitle() {
+  executeReturnToMenu();
+}
+
+function confirmReturnToMenu() {
+  // Pause timer while modal is open
+  clearInterval(state.timerInterval);
+  fullDragCleanup();
+  $('return-overlay').classList.add('show');
+}
+
+function cancelReturnToMenu() {
+  $('return-overlay').classList.remove('show');
+  // Resume timer if the cut-off was still running
+  resumeTimerIfActive();
+}
+
+function executeReturnToMenu() {
+  // Close any open overlays
+  ['return-overlay','risk-overlay','overbooked-overlay',
+   'cutoff-overlay','briefing-overlay','addcargo-overlay'].forEach(id => {
+    const el = $(id);
+    if (el) el.classList.remove('show');
+  });
+
+  // Stop timer and clean up all in-flight state
+  clearInterval(state.timerInterval);
+  fullDragCleanup();
+
+  // Reset round-level state so nothing leaks into the next session
+  state.selectedId    = null;
+  state.grid          = [];
+  state.cargo         = [];
+  state.placedCargo   = new Set();
+  state.rotationState = {};
+  state.reworkCount   = 0;
+  state.reworkPenalty = 0;
+  state.delayCount    = 0;
+  state.delayCostTotal = 0;
+  state.cutoffReached = false;
+  state.optimalLayout = [];
+  state.shipmentType  = null;
+  state.additionalCargoOffered  = false;
+  state.additionalCargoAccepted = false;
+  state.additionalCargoRejectionPenalty = 0;
+  state.loadType = 'fcl';
+  state.timeLeft  = 0;
+  state.timeTotal = 0;
+  // Reset FCL/LCL button selection to default
+  if ($('lt-fcl')) $('lt-fcl').classList.add('selected');
+  if ($('lt-lcl')) $('lt-lcl').classList.remove('selected');
+
+  updateHSDisplay();
+  showScreen('screen-title');
+}
+
+function updateHSDisplay() {
+  const hs = localStorage.getItem('cs_hs') || '—';
+  $('hs-val').textContent = hs === '—' ? '—' : '$' + parseInt(hs).toLocaleString();
+}
+
+// ================================================================
+// INIT
+// ================================================================
+
+updateHSDisplay();
+showScreen('screen-title');
+</script>
+</body>
+</html>

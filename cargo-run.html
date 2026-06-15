@@ -1,0 +1,1907 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Cargo Run — Logistics Arcade</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { height: 100%; background: #0a0a0f; overflow-x: hidden; }
+    #root { min-height: 100vh; }
+    /* Prevent pull-to-refresh and tap highlights on mobile */
+    body { overscroll-behavior: none; -webkit-tap-highlight-color: transparent; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- React + ReactDOM (production) -->
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script crossorigin src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <!-- Babel standalone for JSX transpilation -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.2/babel.min.js"></script>
+
+  <script type="text/babel" data-presets="react">
+    // Destructure React hooks from global React object
+    const { useState, useEffect, useRef, useCallback } = React;
+
+
+// ============================================================
+// CONSTANTS
+// ============================================================
+const TILE = 40;
+const COLS = 15;
+const ROWS = 14;
+const W = COLS * TILE;
+const H = ROWS * TILE;
+
+const MOVE_INTERVAL = 120;
+const ROUND_DURATION = 150;
+
+const VEHICLE_CAPACITY = 10;
+const WAREHOUSE_CAPACITY = 20;   // tighter — 30 was too forgiving
+
+// Warehouse fill thresholds
+const WH_WARN  = 0.60;  // 60%  — first alert
+const WH_CRIT  = 0.75;  // 75%  — urgent alert
+const WH_RESTRICT = 0.90; // 90% — large cargo blocked
+// 100% = full block
+
+// Warehouse storage timers (seconds from stored)
+const PERISH_EXPIRE_SECS = 45;   // generous — player must have time to respond
+const DG_BREACH_SECS     = 55;   // generous for same reason
+
+// Outbound cargo batch size per warehouse visit
+const OUTBOUND_LOAD_COUNT = 4;
+
+// ============================================================
+// OPERATIONAL EVENTS
+// ============================================================
+const EVENTS = [
+  // ---- NEGATIVE (70%) ----
+  { id: "TRAFFIC_SURGE",    label: "TRAFFIC SURGE",    icon: "🚗",  duration: 12, positive: false,
+    dispatch: "Local congestion reported." },
+  { id: "ROADWORKS",        label: "ROADWORKS",        icon: "🚧",  duration: 15, positive: false,
+    dispatch: "Nobody informed planning." },
+  { id: "CUSTOMS_BLITZ",    label: "CUSTOMS BLITZ",    icon: "🛃",  duration: 10, positive: false,
+    dispatch: "Paperwork suddenly matters." },
+  { id: "WAREHOUSE_DELAY",  label: "WAREHOUSE DELAY",  icon: "📦",  duration: 10, positive: false,
+    dispatch: "Apparently everyone needed coffee." },
+  { id: "IT_OUTAGE",        label: "IT OUTAGE",        icon: "💻",  duration: 9,  positive: false,
+    dispatch: "Have you tried turning logistics off and on again?" },
+  { id: "DG_AUDIT",         label: "DG AUDIT",         icon: "☢",  duration: 15, positive: false,
+    dispatch: "Compliance has entered the chat." },
+  // ---- POSITIVE (30%) ----
+  { id: "FLEET_SUPPORT",    label: "FLEET SUPPORT",    icon: "🚛",  duration: 20, positive: true,
+    dispatch: "Additional fleet support available." },
+  { id: "FAST_LANE",        label: "FAST LANE ACCESS", icon: "⚡",  duration: 15, positive: true,
+    dispatch: "Priority route access granted." },
+  { id: "WH_OVERTIME",      label: "WAREHOUSE OVERTIME",icon: "🏭", duration: 20, positive: true,
+    dispatch: "Overtime approved." },
+  { id: "PRIORITY_CONTRACT",label: "PRIORITY CONTRACT", icon: "⭐",  duration: 20, positive: true,
+    dispatch: "Customer suddenly remembered they need it today." },
+];
+
+// Weighted pool: 70% negative, 30% positive
+const NEG_EVENTS = EVENTS.filter(e => !e.positive);
+const POS_EVENTS = EVENTS.filter(e =>  e.positive);
+function pickEvent() {
+  const pool = Math.random() < 0.70 ? NEG_EVENTS : POS_EVENTS;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+const CARGO_TYPES = {
+  STANDARD:    { label: "STD",  color: "#4ADE80", textColor: "#000", capacity: 2, baseRevenue: 80,  dg: false, perishable: false },
+  PERISHABLE:  { label: "COLD", color: "#38BDF8", textColor: "#000", capacity: 2, baseRevenue: 120, dg: false, perishable: true  },
+  DG:          { label: "DG!",  color: "#F97316", textColor: "#fff", capacity: 3, baseRevenue: 200, dg: true,  perishable: false },
+  OVERSIZED:   { label: "BIG",  color: "#A78BFA", textColor: "#fff", capacity: 4, baseRevenue: 150, dg: false, perishable: false },
+  MISDECLARED: { label: "???",  color: "#FCD34D", textColor: "#000", capacity: 2, baseRevenue: 100, dg: false, perishable: false },
+  PRIORITY:    { label: "VIP",  color: "#FF1493", textColor: "#fff", capacity: 2, baseRevenue: 300, dg: false, perishable: false },
+};
+
+const DELIVERY_POINTS = [
+  { x: 1, y: 1 }, { x: 13, y: 1 }, { x: 1, y: 12 }, { x: 13, y: 12 },
+];
+const WAREHOUSE_POS = { x: 7, y: 6 };
+
+// ============================================================
+// CONTRACTS
+// ============================================================
+const CONTRACTS = [
+  {
+    id: "RETAIL",
+    name: "RETAIL DISTRIBUTION",
+    icon: "🛒",
+    difficulty: "EASY",
+    diffColor: "#4ADE80",
+    desc: "High-volume consumer shipments. Predictable operations.",
+    dispatch: "Move boxes. Try not to overthink it.",
+    revMod: 1.10,
+    // Cargo spawn weights (keys must match CARGO_TYPES)
+    weights: { STANDARD: 55, PERISHABLE: 15, DG: 5, OVERSIZED: 15, MISDECLARED: 10 },
+    // Grade thresholds (capture rate %)
+    grades: { S: 90, A: 78, B: 60, C: 42, D: 25 },
+  },
+  {
+    id: "PERISHABLE",
+    name: "PERISHABLE NETWORK",
+    icon: "🧊",
+    difficulty: "MEDIUM",
+    diffColor: "#38BDF8",
+    desc: "Temperature-sensitive cargo. Warehouse timers matter.",
+    dispatch: "The clock starts ticking the moment you unload it.",
+    revMod: 1.25,
+    weights: { STANDARD: 20, PERISHABLE: 50, DG: 5, OVERSIZED: 15, MISDECLARED: 10 },
+    grades: { S: 85, A: 72, B: 56, C: 38, D: 22 },
+  },
+  {
+    id: "DG",
+    name: "DANGEROUS GOODS",
+    icon: "⚠",
+    difficulty: "HARD",
+    diffColor: "#F97316",
+    desc: "Compliance-heavy operations. Inspections and audits.",
+    dispatch: "Everything is fine until compliance arrives.",
+    revMod: 1.35,
+    weights: { STANDARD: 15, PERISHABLE: 10, DG: 50, OVERSIZED: 10, MISDECLARED: 15 },
+    grades: { S: 80, A: 66, B: 50, C: 34, D: 18 },
+  },
+  {
+    id: "PROJECT",
+    name: "PROJECT CARGO",
+    icon: "🏗️",
+    difficulty: "HARD",
+    diffColor: "#F97316",
+    desc: "Large and awkward shipments. Warehouse pressure.",
+    dispatch: "Nobody measured it properly.",
+    revMod: 1.50,
+    weights: { STANDARD: 15, PERISHABLE: 10, DG: 10, OVERSIZED: 55, MISDECLARED: 10 },
+    grades: { S: 75, A: 62, B: 46, C: 30, D: 16 },
+  },
+  {
+    id: "EMERGENCY",
+    name: "EMERGENCY RELIEF",
+    icon: "🚨",
+    difficulty: "VERY HARD",
+    diffColor: "#DC2626",
+    desc: "Time-critical operations. Constant prioritisation required.",
+    dispatch: "Everybody needed it yesterday.",
+    revMod: 1.75,
+    weights: { STANDARD: 10, PERISHABLE: 30, DG: 20, OVERSIZED: 10, MISDECLARED: 30 },
+    grades: { S: 70, A: 57, B: 42, C: 27, D: 14 },
+  },
+];
+
+// Contract-aware grade function
+function gradeForContract(capturePct, contract) {
+  const t = contract.grades;
+  const p = Math.min(100, Math.max(0, capturePct));
+  if (p >= t.S) return { g: "S", color: "#FFD700", name: "LOGISTICS WIZARD"            };
+  if (p >= t.A) return { g: "A", color: "#4ADE80", name: "OPERATIONS HERO"             };
+  if (p >= t.B) return { g: "B", color: "#38BDF8", name: "RELIABLE OPERATOR"           };
+  if (p >= t.C) return { g: "C", color: "#FCD34D", name: "MANAGED SOMEHOW"             };
+  if (p >= t.D) return { g: "D", color: "#F87171", name: "CUSTOMER COMPLAINT PENDING"  };
+  return             { g: "F", color: "#DC2626", name: "PLEASE ATTEND RETRAINING"    };
+}
+
+// Weighted random pick from CARGO_TYPES using contract weights
+function pickCargoType(weights) {
+  const entries = Object.entries(weights);
+  const total   = entries.reduce((s, [, w]) => s + w, 0);
+  let roll = Math.random() * total;
+  for (const [type, w] of entries) {
+    roll -= w;
+    if (roll <= 0) return type;
+  }
+  return entries[entries.length - 1][0];
+}
+
+// localStorage high scores
+const HS_KEY = "cargorun_hs_v1";
+function loadHighScores() {
+  try { return JSON.parse(localStorage.getItem(HS_KEY) || "{}"); } catch { return {}; }
+}
+function saveHighScore(contractId, capturePct, revenue, gradeG) {
+  const hs = loadHighScores();
+  const prev = hs[contractId] || {};
+  hs[contractId] = {
+    bestCapture: Math.max(capturePct, prev.bestCapture || 0),
+    bestRevenue: Math.max(revenue,    prev.bestRevenue || 0),
+    bestGrade:   compareGrades(gradeG, prev.bestGrade || "F") > 0 ? gradeG : (prev.bestGrade || "F"),
+  };
+  try { localStorage.setItem(HS_KEY, JSON.stringify(hs)); } catch {}
+  return hs[contractId];
+}
+const GRADE_ORDER = ["F","D","C","B","A","S"];
+function compareGrades(a, b) {
+  return GRADE_ORDER.indexOf(a) - GRADE_ORDER.indexOf(b);
+}
+
+// ============================================================
+// MAP
+// ============================================================
+function buildMap() {
+  const map = Array.from({ length: ROWS }, () => Array(COLS).fill(1));
+  [1, 4, 6, 9, 12].forEach(row => { for (let c = 0; c < COLS; c++) map[row][c] = 0; });
+  [1, 4, 7, 10, 13].forEach(col => { for (let r = 0; r < ROWS; r++) map[r][col] = 0; });
+  map[WAREHOUSE_POS.y    ][WAREHOUSE_POS.x    ] = 2;
+  map[WAREHOUSE_POS.y    ][WAREHOUSE_POS.x + 1] = 2;
+  map[WAREHOUSE_POS.y + 1][WAREHOUSE_POS.x    ] = 2;
+  map[WAREHOUSE_POS.y + 1][WAREHOUSE_POS.x + 1] = 2;
+  DELIVERY_POINTS.forEach(p => { map[p.y][p.x] = 3; });
+  return map;
+}
+
+function getRoadTiles(map) {
+  const tiles = [];
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++)
+      if (map[r][c] === 0) tiles.push({ x: c, y: r });
+  return tiles;
+}
+
+// ============================================================
+// MESSAGES
+// ============================================================
+const DELAY_MSGS = [
+  "Cargo not ready.",
+  "Forklift unavailable.",
+  "Paperwork still printing.",
+  "Driver on a break.",
+  "Loading bay occupied.",
+];
+const END_QUIPS = [
+  "Dispatch said it would fit.",
+  "Customs interested in your paperwork.",
+  "Warehouse somehow already full.",
+  "Documentation issue.",
+  "Forklift operator disappeared.",
+  "Security protocol engaged.",
+  "Traffic management intervention.",
+  "No one knows where the manifest went.",
+];
+
+// ============================================================
+// GRADING — capped 0–100
+// ============================================================
+const GRADE_DISPATCH = {
+  S: [
+    "Dispatch has stopped questioning your decisions.",
+    "Even the forklift driver looked impressed.",
+    "The warehouse has never been this happy.",
+    "Some cargos are still talking about it.",
+    "No complaints. Unprecedented.",
+  ],
+  A: [
+    "One forklift operator wants your autograph.",
+    "Management noticed. They said nothing, but they noticed.",
+    "Solid result. The cargo arrived mostly intact.",
+    "Dispatch is cautiously optimistic.",
+    "A few corners cut, but results delivered.",
+  ],
+  B: [
+    "Solid shift. Nobody cried.",
+    "The warehouse is satisfied. Mostly.",
+    "Reliable. Not inspiring. Reliable.",
+    "Cargo moved. Revenue earned. Tea consumed.",
+    "Dispatch has seen worse. Much worse.",
+  ],
+  C: [
+    "The cargo moved. Eventually.",
+    "Some items were slightly less on time than ideal.",
+    "Several things worked out. Others are still being investigated.",
+    "Dispatch has filed a moderate report.",
+    "Room for improvement. A lot of room.",
+  ],
+  D: [
+    "Several conversations are required.",
+    "The paperwork is longer than the shift.",
+    "Dispatch is composing an email. A long one.",
+    "A review has been scheduled. Also a re-review.",
+    "The warehouse has questions. Many questions.",
+  ],
+  F: [
+    "Customs would like a word.",
+    "A full incident report has been submitted.",
+    "The cargo is somewhere. Dispatch is investigating.",
+    "Retraining has been booked. And booked again.",
+    "Nobody is talking about this shift. Ever.",
+  ],
+};
+
+function grade(pct) {
+  const p = Math.min(100, Math.max(0, pct));
+  if (p >= 90) return { g: "S", color: "#FFD700", name: "LOGISTICS WIZARD",   threshold: "90–100" };
+  if (p >= 75) return { g: "A", color: "#4ADE80", name: "OPERATIONS HERO",    threshold: "75–89"  };
+  if (p >= 55) return { g: "B", color: "#38BDF8", name: "RELIABLE OPERATOR",  threshold: "55–74"  };
+  if (p >= 35) return { g: "C", color: "#FCD34D", name: "MANAGED SOMEHOW",    threshold: "35–54"  };
+  if (p >= 20) return { g: "D", color: "#F87171", name: "CUSTOMER COMPLAINT PENDING", threshold: "20–34" };
+  return         { g: "F", color: "#DC2626", name: "PLEASE ATTEND RETRAINING", threshold: "0–19"  };
+}
+
+function pickDispatch(g) {
+  const pool = GRADE_DISPATCH[g] || GRADE_DISPATCH.F;
+  return pool[Math.floor(Math.random() * pool.length)];
+}
+
+// ============================================================
+// PRIORITY SORT for outbound loading
+// Perishables closest to expiry → DG closest to breach → oldest → standard
+// ============================================================
+function sortOutboundPriority(warehouseItems) {
+  return [...warehouseItems].sort((a, b) => {
+    const aPerish = CARGO_TYPES[a.type].perishable;
+    const bPerish = CARGO_TYPES[b.type].perishable;
+    const aDG     = CARGO_TYPES[a.type].dg;
+    const bDG     = CARGO_TYPES[b.type].dg;
+
+    // Perishables first — by urgency (time remaining ascending)
+    if (aPerish && !bPerish) return -1;
+    if (!aPerish && bPerish) return 1;
+    if (aPerish && bPerish) return (b.storedSecs || 0) - (a.storedSecs || 0); // most stored first
+
+    // DG next
+    if (aDG && !bDG) return -1;
+    if (!aDG && bDG) return 1;
+    if (aDG && bDG) return (b.storedSecs || 0) - (a.storedSecs || 0);
+
+    // Oldest standard cargo
+    return (b.storedSecs || 0) - (a.storedSecs || 0);
+  });
+}
+
+// ============================================================
+// MAIN GAME
+// ============================================================
+function CargoRun() {
+  const mapRef       = useRef(buildMap());
+  const roadTilesRef = useRef(getRoadTiles(mapRef.current));
+  const moveQueueRef = useRef([]);
+  const lastMoveRef  = useRef(0);
+  const animFrameRef = useRef(null);
+  const modalCooldownRef = useRef(0);
+  const moveIntervalRef = useRef(120); // ms per step — modified by FAST_LANE event
+  const nextEventInRef  = useRef(45);  // seconds until next event attempt
+
+  // ---- events ----
+  // activeEvent: { ...eventDef, remaining: seconds } | null
+  // eventHistory: { [id]: count }
+
+  // ---- phase ----
+  const [phase, setPhase] = useState("title"); // title | contract | playing | roundend
+
+  // ---- player ----
+  const [player, setPlayer] = useState({ x: 7, y: 9, dir: { x: 0, y: 0 } });
+  const [frozen, setFrozen] = useState(0);
+
+  // ---- cargo ----
+  const [mapCargos,  setMapCargos]  = useState([]);  // on map, no timers
+  const [truckLoad,  setTruckLoad]  = useState([]);  // in truck (inbound OR outbound cargo)
+  const [warehouse,  setWarehouse]  = useState([]);  // in warehouse, WITH storedSecs timers
+
+  // ---- movers ----
+  const [movers, setMovers] = useState([]);
+
+  // ---- mode ----
+  // mode: "inbound" | "outbound"
+  // outboundCargoLoaded: truck currently carries outbound cargo from warehouse
+  const [mode,               setMode]               = useState("inbound");
+  const [outboundCargoLoaded, setOutboundCargoLoaded] = useState(false);
+
+  // ---- economy ----
+  const [revenue,           setRevenue]           = useState(0);
+  const [lostRevenue,       setLostRevenue]        = useState(0);
+  const [penalties,         setPenalties]          = useState(0);
+  const [inboundCollected,  setInboundCollected]   = useState(0);
+  const [outboundDelivered, setOutboundDelivered]  = useState(0);
+  const [perishDelivered,   setPerishDelivered]    = useState(0);
+  const [perishExpired,     setPerishExpired]      = useState(0);
+  const [dgCleared,         setDgCleared]          = useState(0);
+  const [dgBreaches,        setDgBreaches]         = useState(0);
+  const [totalPossible,     setTotalPossible]      = useState(1);
+  const [hadWarning,        setHadWarning]         = useState(false); // fairness flag
+
+  // ---- time ----
+  const [timer,   setTimer]   = useState(ROUND_DURATION);
+  const [elapsed, setElapsed] = useState(0);
+
+  // ---- contract ----
+  const [selectedContract, setSelectedContract] = useState(CONTRACTS[0]);
+  const [potentialRevenue, setPotentialRevenue] = useState(0);  // total possible £ this run
+
+  // ---- UI ----
+  const [popup,         setPopup]         = useState(null);
+  const [alerts,        setAlerts]        = useState([]);
+  const [outboundModal, setOutboundModal] = useState(false);
+  const [roundStats,    setRoundStats]    = useState(null);
+  const [activeEvent,   setActiveEvent]   = useState(null);  // { ...def, remaining }
+  const [eventHistory,  setEventHistory]  = useState({});    // { eventId: count }
+
+  const map = mapRef.current;
+
+  // ============================================================
+  // HELPERS
+  // ============================================================
+  const showPopup = useCallback((msg, dur = 1800) => {
+    setPopup({ msg });
+    setTimeout(() => setPopup(p => p?.msg === msg ? null : p), dur);
+  }, []);
+
+  const isWalkable     = useCallback((x, y) => x >= 0 && x < COLS && y >= 0 && y < ROWS && map[y][x] !== 1, [map]);
+  const isWarehouseTile= useCallback((x, y) => map[y]?.[x] === 2, [map]);
+  const isDeliveryZone = useCallback((x, y) => map[y]?.[x] === 3, [map]);
+
+  // ============================================================
+  // SPAWN
+  // ============================================================
+  const spawnCargo = useCallback((count = 8, contractWeights = null) => {
+    const roads = roadTilesRef.current.filter(t =>
+      !(t.x === WAREHOUSE_POS.x   && t.y === WAREHOUSE_POS.y) &&
+      !(t.x === WAREHOUSE_POS.x+1 && t.y === WAREHOUSE_POS.y) &&
+      !(t.x === WAREHOUSE_POS.x   && t.y === WAREHOUSE_POS.y+1) &&
+      !(t.x === WAREHOUSE_POS.x+1 && t.y === WAREHOUSE_POS.y+1)
+    );
+    const typeKeys = Object.keys(CARGO_TYPES).filter(k => k !== "PRIORITY");
+    const spawned = Array.from({ length: count }, () => {
+      const pos     = roads[Math.floor(Math.random() * roads.length)];
+      const typeKey = contractWeights
+        ? pickCargoType(contractWeights)
+        : typeKeys[Math.floor(Math.random() * typeKeys.length)];
+      return {
+        id: Math.random().toString(36).slice(2),
+        x: pos.x, y: pos.y,
+        type: typeKey,
+        actualCapacity: CARGO_TYPES[typeKey].capacity,
+      };
+    });
+    // Track potential revenue for new spawns
+    const newPotential = spawned.reduce((s, c) => {
+      return s + Math.round(CARGO_TYPES[c.type].baseRevenue * (selectedContract?.revMod || 1));
+    }, 0);
+    setPotentialRevenue(p => p + newPotential);
+    return spawned;
+  }, [selectedContract]);
+
+  const spawnMovers = useCallback(() => {
+    const roads = roadTilesRef.current;
+    return Array.from({ length: 3 }, (_, i) => ({
+      id: "m" + i,
+      x: roads[Math.floor(Math.random() * roads.length)].x,
+      y: roads[Math.floor(Math.random() * roads.length)].y,
+      dir: [{ x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}][Math.floor(Math.random()*4)],
+      label: ["🚧","🚗","🏗️"][i % 3],
+    }));
+  }, []);
+
+  // ============================================================
+  // START ROUND
+  // ============================================================
+  const startRound = useCallback((contract) => {
+    const ct = contract || selectedContract;
+    mapRef.current       = buildMap();
+    roadTilesRef.current = getRoadTiles(mapRef.current);
+    moveQueueRef.current = [];
+    modalCooldownRef.current = 0;
+    // Reset potential revenue BEFORE spawning so spawnCargo tracks from 0
+    setPotentialRevenue(0);
+    // Spawn with contract weights — note: spawnCargo calls setPotentialRevenue internally
+    // so we need the new potential to accumulate. Use a temp approach: reset first, then spawn.
+    setPlayer({ x: 7, y: 9, dir: { x: 0, y: 0 } });
+    setFrozen(0);
+    setTruckLoad([]);
+    setWarehouse([]);
+    setMovers(spawnMovers());
+    setMode("inbound");
+    setOutboundCargoLoaded(false);
+    setRevenue(0);
+    setLostRevenue(0);
+    setPenalties(0);
+    setInboundCollected(0);
+    setOutboundDelivered(0);
+    setPerishDelivered(0);
+    setPerishExpired(0);
+    setDgCleared(0);
+    setDgBreaches(0);
+    setTotalPossible(1); // replaced by potentialRevenue
+    setHadWarning(false);
+    setTimer(ROUND_DURATION);
+    setElapsed(0);
+    setPopup(null);
+    setAlerts([]);
+    setOutboundModal(false);
+    setRoundStats(null);
+    setActiveEvent(null);
+    setEventHistory({});
+    moveIntervalRef.current = 120;
+    nextEventInRef.current  = 45;
+    // Spawn AFTER state resets; selectedContract may have just changed
+    const cargo = Array.from({ length: 10 }, () => {
+      const roads = getRoadTiles(buildMap ? mapRef.current : mapRef.current).filter(t =>
+        !(t.x === WAREHOUSE_POS.x   && t.y === WAREHOUSE_POS.y) &&
+        !(t.x === WAREHOUSE_POS.x+1 && t.y === WAREHOUSE_POS.y) &&
+        !(t.x === WAREHOUSE_POS.x   && t.y === WAREHOUSE_POS.y+1) &&
+        !(t.x === WAREHOUSE_POS.x+1 && t.y === WAREHOUSE_POS.y+1)
+      );
+      const pos     = roads[Math.floor(Math.random() * roads.length)];
+      const typeKey = pickCargoType(ct.weights);
+      return {
+        id: Math.random().toString(36).slice(2),
+        x: pos.x, y: pos.y,
+        type: typeKey,
+        actualCapacity: CARGO_TYPES[typeKey].capacity,
+      };
+    });
+    const initPotential = cargo.reduce((s, c) =>
+      s + Math.round(CARGO_TYPES[c.type].baseRevenue * ct.revMod), 0);
+    setPotentialRevenue(initPotential);
+    setMapCargos(cargo);
+    setPhase("playing");
+  }, [selectedContract, spawnMovers]);
+
+  // ============================================================
+  // SWITCH TO OUTBOUND (shared logic for button + modal)
+  // ============================================================
+  const switchToOutbound = useCallback(() => {
+    setMode("outbound");
+    setOutboundModal(false);
+    showPopup("OUTBOUND MODE — return to warehouse to load cargo.", 2500);
+  }, [showPopup]);
+
+  const switchToInbound = useCallback(() => {
+    setMode("inbound");
+    setOutboundCargoLoaded(false);
+    // Don't clear truckLoad here — player may have mixed cargo; just flip mode
+    showPopup("INBOUND MODE — collect cargo from the map.", 1800);
+  }, [showPopup]);
+
+  // ============================================================
+  // END ROUND
+  // ============================================================
+  const endRound = useCallback(() => {
+    setPhase("roundend");
+  }, []);
+
+  // ============================================================
+  // RAF MOVEMENT LOOP
+  // ============================================================
+  useEffect(() => {
+    if (phase !== "playing") return;
+    const loop = (ts) => {
+      if (ts - lastMoveRef.current >= moveIntervalRef.current) {
+        lastMoveRef.current = ts;
+        doTick();
+      }
+      animFrameRef.current = requestAnimationFrame(loop);
+    };
+    animFrameRef.current = requestAnimationFrame(loop);
+    return () => cancelAnimationFrame(animFrameRef.current);
+  }, [phase]);
+
+  // ============================================================
+  // SECOND TIMER — warehouse timers, movers, alerts, cargo spawn
+  // ============================================================
+  useEffect(() => {
+    if (phase !== "playing") return;
+
+    const id = setInterval(() => {
+
+      // countdown
+      setTimer(t => {
+        if (t <= 1) { endRound(); return 0; }
+        return t - 1;
+      });
+      setElapsed(e => e + 1);
+
+      // move movers
+      setMovers(prev => prev.map(m => {
+        const roads = roadTilesRef.current;
+        let nx = m.x + m.dir.x, ny = m.y + m.dir.y;
+        if (!roads.find(r => r.x === nx && r.y === ny)) {
+          const dirs = [{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}];
+          const nd = dirs[Math.floor(Math.random() * dirs.length)];
+          nx = m.x + nd.x; ny = m.y + nd.y;
+          return roads.find(r => r.x === nx && r.y === ny) ? { ...m, x: nx, y: ny, dir: nd } : m;
+        }
+        return { ...m, x: nx, y: ny };
+      }));
+
+      // spawn map cargo if low (with contract weights)
+      setMapCargos(prev => {
+        if (prev.length < 5) {
+          const roads = roadTilesRef.current.filter(t =>
+            !(t.x === WAREHOUSE_POS.x   && t.y === WAREHOUSE_POS.y) &&
+            !(t.x === WAREHOUSE_POS.x+1 && t.y === WAREHOUSE_POS.y) &&
+            !(t.x === WAREHOUSE_POS.x   && t.y === WAREHOUSE_POS.y+1) &&
+            !(t.x === WAREHOUSE_POS.x+1 && t.y === WAREHOUSE_POS.y+1)
+          );
+          const spawned = Array.from({ length: 3 }, () => {
+            const pos = roads[Math.floor(Math.random() * roads.length)];
+            const typeKey = selectedContract
+              ? pickCargoType(selectedContract.weights)
+              : Object.keys(CARGO_TYPES).filter(k => k !== "PRIORITY")[Math.floor(Math.random() * 5)];
+            return { id: Math.random().toString(36).slice(2), x: pos.x, y: pos.y,
+              type: typeKey, actualCapacity: CARGO_TYPES[typeKey].capacity };
+          });
+          const newPot = spawned.reduce((s, c) =>
+            s + Math.round(CARGO_TYPES[c.type].baseRevenue * (selectedContract?.revMod || 1)), 0);
+          setPotentialRevenue(p => p + newPot);
+          return [...prev, ...spawned];
+        }
+        return prev;
+      });
+
+      // warehouse timers + expiry + DG breach
+      setWarehouse(wh => {
+        if (wh.length === 0) return wh;
+        const updated = wh.map(item => ({ ...item, storedSecs: (item.storedSecs || 0) + 1 }));
+
+        // Perishable expiry
+        const nowExpired = updated.filter(item =>
+          CARGO_TYPES[item.type].perishable && item.storedSecs >= PERISH_EXPIRE_SECS
+        );
+        if (nowExpired.length > 0) {
+          const lost = nowExpired.reduce((s, i) => s + CARGO_TYPES[i.type].baseRevenue, 0);
+          setPerishExpired(e => e + nowExpired.length);
+          setLostRevenue(l => l + lost);
+          showPopup(`Temperature-sensitive cargo expired. -£${lost}`, 2500);
+        }
+
+        // DG breach (first-time only per item)
+        const dgBreached = updated.filter(item =>
+          CARGO_TYPES[item.type].dg && item.storedSecs >= DG_BREACH_SECS && !item.breached
+        );
+        if (dgBreached.length > 0) {
+          const fine = dgBreached.length * 80;
+          setDgBreaches(d => d + dgBreached.length);
+          setPenalties(p => p + fine);
+          setRevenue(r => Math.max(0, r - fine));
+          setLostRevenue(l => l + fine);
+          showPopup(`DG storage breach. Compliance fine -£${fine}`, 2500);
+        }
+
+        return updated
+          .filter(item => !(CARGO_TYPES[item.type].perishable && item.storedSecs >= PERISH_EXPIRE_SECS))
+          .map(item => (CARGO_TYPES[item.type].dg && item.storedSecs >= DG_BREACH_SECS && !item.breached)
+            ? { ...item, breached: true } : item
+          );
+      });
+
+      // alerts + modal trigger (reads fresh warehouse via setter pattern)
+      setWarehouse(wh => {
+        const whPct         = wh.length / WAREHOUSE_CAPACITY;
+        const hasUrgentPerish = wh.some(i => CARGO_TYPES[i.type].perishable && (i.storedSecs || 0) >= PERISH_EXPIRE_SECS * 0.55);
+        const hasUrgentDG     = wh.some(i => CARGO_TYPES[i.type].dg         && (i.storedSecs || 0) >= DG_BREACH_SECS     * 0.55);
+
+        const newAlerts = [];
+        if      (whPct >= WH_CRIT)    newAlerts.push("⚠ WAREHOUSE CRITICAL — begin outbound deliveries");
+        else if (whPct >= WH_WARN)    newAlerts.push("⚡ Warehouse filling up");
+        if (hasUrgentPerish)          newAlerts.push("🧊 PERISHABLE ALERT — temperature cargo nearing expiry");
+        if (hasUrgentDG)              newAlerts.push("☢ DG ALERT — hazardous cargo nearing compliance limit");
+
+        setAlerts(newAlerts);
+
+        const shouldPrompt = whPct >= WH_CRIT || hasUrgentPerish || hasUrgentDG;
+        if (shouldPrompt) setHadWarning(true);
+        if (shouldPrompt && (Date.now() - modalCooldownRef.current) > 25000) {
+          setOutboundModal(true);
+        }
+
+        return wh;
+      });
+
+      // ---- OPERATIONAL EVENTS TICK ----
+      // 1. Countdown active event
+      setActiveEvent(ev => {
+        if (!ev) return null;
+        const remaining = ev.remaining - 1;
+        if (remaining <= 0) {
+          // Event expired — restore any modifications
+          if (ev.id === "FAST_LANE")       moveIntervalRef.current = 120;
+          if (ev.id === "TRAFFIC_SURGE")   {} // movers already back to normal count next spawn cycle
+          return null;
+        }
+        // DG_AUDIT: accelerate DG stored timer each second by +1 extra
+        if (ev.id === "DG_AUDIT") {
+          setWarehouse(wh => wh.map(item =>
+            CARGO_TYPES[item.type].dg ? { ...item, storedSecs: (item.storedSecs || 0) + 1 } : item
+          ));
+        }
+        return { ...ev, remaining };
+      });
+
+      // 2. Count down to next event
+      setElapsed(e => e); // read-only touch; real logic uses ref
+      nextEventInRef.current -= 1;
+      if (nextEventInRef.current <= 0) {
+        setActiveEvent(current => {
+          if (current) {
+            // Event already active — don't stack; reschedule
+            nextEventInRef.current = 15;
+            return current;
+          }
+          const ev = pickEvent();
+          const newEv = { ...ev, remaining: ev.duration };
+          // Apply immediate effects
+          if (ev.id === "FAST_LANE")      moveIntervalRef.current = 96; // ~25% faster
+          if (ev.id === "TRAFFIC_SURGE") {
+            // Add extra movers temporarily
+            setMovers(mv => {
+              const roads = roadTilesRef.current;
+              const extra = Array.from({ length: 2 }, (_, i) => ({
+                id: "surge_" + i + "_" + Date.now(),
+                x: roads[Math.floor(Math.random() * roads.length)].x,
+                y: roads[Math.floor(Math.random() * roads.length)].y,
+                dir: [{x:1,y:0},{x:-1,y:0},{x:0,y:1},{x:0,y:-1}][Math.floor(Math.random()*4)],
+                label: "🚗",
+                surge: true,
+              }));
+              return [...mv, ...extra];
+            });
+          }
+          if (ev.id === "PRIORITY_CONTRACT") {
+            // Spawn high-value priority cargo on the map and track potential
+            const roads = roadTilesRef.current.filter(t =>
+              !(t.x === WAREHOUSE_POS.x   && t.y === WAREHOUSE_POS.y) &&
+              !(t.x === WAREHOUSE_POS.x+1 && t.y === WAREHOUSE_POS.y)
+            );
+            const pos = roads[Math.floor(Math.random() * roads.length)];
+            setMapCargos(prev => [...prev, {
+              id: "priority_" + Date.now(),
+              x: pos.x, y: pos.y,
+              type: "PRIORITY",
+              actualCapacity: CARGO_TYPES.PRIORITY.capacity,
+            }]);
+            // Add to potential revenue
+            setPotentialRevenue(p => p + Math.round(300 * (selectedContract?.revMod || 1)));
+          }
+          // Track in history
+          setEventHistory(h => ({ ...h, [ev.id]: (h[ev.id] || 0) + 1 }));
+          // Show dispatch popup
+          showPopup(`${ev.icon} ${ev.label}: ${ev.dispatch}`, 3000);
+          // Schedule next event — scale with elapsed time
+          setElapsed(elapsed => {
+            const baseInterval = elapsed < 45 ? 45 : elapsed < 90 ? 33 : 22;
+            nextEventInRef.current = baseInterval + Math.floor(Math.random() * 15);
+            return elapsed;
+          });
+          return newEv;
+        });
+      }
+
+      // 3. When TRAFFIC_SURGE expires, remove surge movers
+      setActiveEvent(ev => {
+        if (ev === null) {
+          setMovers(mv => mv.filter(m => !m.surge));
+        }
+        return ev;
+      });
+
+    }, 1000);
+    return () => clearInterval(id);
+  }, [phase, endRound, spawnCargo, showPopup]);
+
+  // Modal dismiss → reset cooldown
+  useEffect(() => {
+    if (!outboundModal) modalCooldownRef.current = Date.now();
+  }, [outboundModal]);
+
+  // ============================================================
+  // TICK via ref (always fresh closure)
+  // ============================================================
+  const tickRef = useRef(null);
+  const doTick  = useCallback(() => { if (tickRef.current) tickRef.current(); }, []);
+
+  useEffect(() => {
+    tickRef.current = () => {
+      setFrozen(f => {
+        if (f > 0) return f - 1;
+
+        const dir = moveQueueRef.current.shift() || null;
+        if (!dir) return 0;
+
+        setPlayer(p => {
+          const nx = p.x + dir.x;
+          const ny = p.y + dir.y;
+          if (!isWalkable(nx, ny)) return p;
+
+          // ---- mover collision ----
+          setMovers(mv => {
+            const hit = mv.find(m => m.x === nx && m.y === ny);
+            if (hit) {
+              setFrozen(3);
+              setPenalties(pen => pen + 25);
+              setRevenue(r => Math.max(0, r - 25));
+              setLostRevenue(l => l + 25);
+              showPopup("Security hold. Fine applied. -£25", 2000);
+            }
+            return mv;
+          });
+
+          // ---- INBOUND: collect map cargo ----
+          // Block map cargo collection in outbound mode
+          if (mode === "inbound") {
+            setMapCargos(prev => {
+              const idx = prev.findIndex(c => c.x === nx && c.y === ny);
+              if (idx === -1) return prev;
+
+              const cargo = prev[idx];
+              const type  = CARGO_TYPES[cargo.type];
+
+              setTruckLoad(ld => {
+                const usedCap = ld.reduce((s, c) => s + c.actualCapacity, 0);
+
+                let actualCap   = type.capacity;
+                let misdeclared = false;
+                if (cargo.type === "MISDECLARED") {
+                  actualCap   = Math.random() < 0.5 ? 1 : 4;
+                  misdeclared = true;
+                }
+
+                const whCount = 0; // checked separately below
+                // activeEvent read via closure — tick always reassigns so it's fresh
+                const capNow = VEHICLE_CAPACITY + (activeEvent?.id === "FLEET_SUPPORT" ? 3 : 0);
+                if (usedCap + actualCap > capNow) {
+                  showPopup("Vehicle at capacity. Return to warehouse.", 1800);
+                  return ld;
+                }
+
+                if (Math.random() < 0.15) {
+                  setFrozen(4);
+                  showPopup(DELAY_MSGS[Math.floor(Math.random() * DELAY_MSGS.length)], 1500);
+                }
+                if (misdeclared) {
+                  showPopup(actualCap > 2
+                    ? "DECLARED DIMENSIONS INCORRECT. Larger than stated."
+                    : "DECLARED DIMENSIONS INCORRECT. Actually quite small.", 2000);
+                }
+                const customsChance = activeEvent?.id === "CUSTOMS_BLITZ" ? 0.5 : 0.2;
+                if (type.dg && Math.random() < customsChance) {
+                  setFrozen(activeEvent?.id === "CUSTOMS_BLITZ" ? 7 : 5);
+                  showPopup(activeEvent?.id === "CUSTOMS_BLITZ"
+                    ? "🛃 CUSTOMS BLITZ: Extended inspection. -time."
+                    : "DG inspection triggered. Customs interested in your paperwork.", 2000);
+                }
+
+                setInboundCollected(c => c + 1);
+                return [...ld, { ...cargo, actualCapacity: actualCap }];
+              });
+
+              return prev.filter((_, i) => i !== idx);
+            });
+          }
+
+          // ---- WAREHOUSE tile ----
+          if (isWarehouseTile(nx, ny)) {
+            if (mode === "inbound") {
+              // INBOUND: unload truck → warehouse
+              setTruckLoad(ld => {
+                if (ld.length === 0) return ld;
+                setWarehouse(wh => {
+                  if (wh.length >= WAREHOUSE_CAPACITY) {
+                    showPopup("Warehouse full. Switch to Outbound Mode first.", 2200);
+                    return wh;
+                  }
+                  // 90% restriction: block large cargo
+                  const restricted = wh.length / WAREHOUSE_CAPACITY >= WH_RESTRICT;
+                  const toStore = ld.filter(c => !restricted || c.actualCapacity <= 2);
+                  const blocked = ld.filter(c => restricted && c.actualCapacity > 2);
+                  if (blocked.length > 0) {
+                    showPopup(`Warehouse at 90%+. ${blocked.length} large item(s) blocked.`, 2200);
+                  }
+                  if (toStore.length === 0) return wh;
+
+                  // WAREHOUSE_DELAY: add a brief freeze; WH_OVERTIME: skip delay
+                  if (activeEvent?.id === "WAREHOUSE_DELAY") {
+                    setFrozen(f => f + 6);
+                    showPopup("📦 Warehouse Delay: slow loading in effect.", 1500);
+                  }
+
+                  const revMod_ = selectedContract?.revMod || 1;
+                  const immediateScore = toStore.reduce((s, c) => {
+                    if (CARGO_TYPES[c.type].perishable || CARGO_TYPES[c.type].dg) return s;
+                    return s + Math.round(CARGO_TYPES[c.type].baseRevenue * revMod_);
+                  }, 0);
+                  if (immediateScore > 0) setRevenue(r => r + immediateScore);
+
+                  const stored = toStore.map(c => ({ ...c, storedSecs: 0, breached: false }));
+                  const suffix = immediateScore > 0 ? `+£${immediateScore}` : "Perishable/DG — deliver outbound for revenue.";
+                  showPopup(`Unloaded ${toStore.length} item${toStore.length > 1 ? "s" : ""}. ${suffix}`, 2000);
+                  return [...wh, ...stored];
+                });
+                return []; // clear truck
+              });
+
+            } else {
+              // OUTBOUND: load priority cargo from warehouse onto truck
+              setWarehouse(wh => {
+                if (wh.length === 0) {
+                  showPopup("Warehouse empty. Nothing to load.", 1800);
+                  return wh;
+                }
+                if (outboundCargoLoaded) {
+                  showPopup("Already loaded. Deliver to an OUT zone.", 1800);
+                  return wh;
+                }
+                const sorted    = sortOutboundPriority(wh);
+                const toLoad    = sorted.slice(0, OUTBOUND_LOAD_COUNT);
+                const remaining = wh.filter(i => !toLoad.find(l => l.id === i.id));
+                setTruckLoad(toLoad);
+                setOutboundCargoLoaded(true);
+                const urgentLabels = toLoad.map(i => CARGO_TYPES[i.type].label).join(" ");
+                showPopup(`Loaded ${toLoad.length} items: ${urgentLabels}. Drive to OUT zone.`, 2500);
+                return remaining;
+              });
+            }
+          }
+
+          // ---- DELIVERY ZONE ----
+          if (isDeliveryZone(nx, ny)) {
+            if (mode !== "outbound") {
+              showPopup("Outbound mode inactive.", 1200);
+            } else if (!outboundCargoLoaded) {
+              showPopup("No outbound cargo. Return to warehouse to load.", 1800);
+            } else {
+              // Deliver whatever is on truck (outbound cargo)
+              setTruckLoad(ld => {
+                if (ld.length === 0) {
+                  showPopup("Truck empty.", 1200);
+                  return ld;
+                }
+                const revMod__ = selectedContract?.revMod || 1;
+                let score = 0;
+                ld.forEach(item => {
+                  const base = Math.round(CARGO_TYPES[item.type].baseRevenue * revMod__);
+                  if (CARGO_TYPES[item.type].perishable) {
+                    const decay  = Math.min(1, (item.storedSecs || 0) / PERISH_EXPIRE_SECS);
+                    const earned = Math.round(base * (1 - decay) * 1.1);
+                    score += earned;
+                    setPerishDelivered(d => d + 1);
+                  } else if (CARGO_TYPES[item.type].dg) {
+                    const earned = item.breached ? Math.round(base * 0.4) : Math.round(base * 1.2);
+                    score += earned;
+                    setDgCleared(d => d + 1);
+                  } else {
+                    score += Math.round(base * 1.15);
+                  }
+                  setOutboundDelivered(d => d + 1);
+                });
+
+                setRevenue(r => r + score);
+                showPopup(`Delivered ×${ld.length}. +£${score}`, 2000);
+                setOutboundCargoLoaded(false);
+
+                // Auto-switch back to inbound when warehouse drops safe + truck now empty
+                setWarehouse(wh => {
+                  if (wh.length / WAREHOUSE_CAPACITY < WH_WARN) {
+                    setMode("inbound");
+                    showPopup(`Warehouse clear. Switching to Inbound Mode.`, 2000);
+                  }
+                  return wh;
+                });
+
+                return []; // clear truck
+              });
+            }
+          }
+
+          return { x: nx, y: ny, dir };
+        });
+
+        return 0;
+      });
+    };
+  }); // intentionally no deps — always fresh
+
+  // ============================================================
+  // KEYBOARD INPUT
+  // ============================================================
+  useEffect(() => {
+    if (phase !== "playing") return;
+    const onKey = (e) => {
+      const dirs = {
+        ArrowUp: {x:0,y:-1}, ArrowDown: {x:0,y:1},
+        ArrowLeft: {x:-1,y:0}, ArrowRight: {x:1,y:0},
+        w: {x:0,y:-1}, s: {x:0,y:1}, a: {x:-1,y:0}, d: {x:1,y:0},
+      };
+      if (dirs[e.key]) { e.preventDefault(); moveQueueRef.current = [dirs[e.key]]; }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [phase]);
+
+  const handleDpad = (dir) => {
+    if (phase !== "playing") return;
+    moveQueueRef.current = [dir];
+  };
+
+  // ============================================================
+  // ROUND STATS
+  // ============================================================
+  useEffect(() => {
+    if (phase !== "roundend") return;
+
+    // Primary: Revenue Capture Rate
+    const capturePct = Math.min(100, Math.max(0,
+      Math.round((revenue / Math.max(potentialRevenue, 1)) * 100)
+    ));
+
+    // Adjustments: small penalties for operational failures
+    const perishPenalty = perishExpired > 0 ? Math.min(10, perishExpired * 2) : 0;
+    const dgPenalty     = dgBreaches    > 0 ? Math.min(8,  dgBreaches    * 2) : 0;
+    const penPenalty    = penalties     > 0 ? Math.min(6,  Math.round(penalties / 50)) : 0;
+    const adjustedCapture = Math.max(0, capturePct - perishPenalty - dgPenalty - penPenalty);
+
+    const whEff = Math.max(0, Math.round((1 - warehouse.length / WAREHOUSE_CAPACITY) * 100));
+    const gr    = gradeForContract(adjustedCapture, selectedContract);
+
+    // Value left behind breakdown
+    const perishLost  = perishExpired  > 0 ? perishExpired  * Math.round(120 * (selectedContract?.revMod || 1)) : 0;
+    const dgPenLost   = dgBreaches     > 0 ? dgBreaches     * 80 : 0;
+    const obstaclesLost = penalties;
+    const missedCargo = Math.max(0, potentialRevenue - revenue - perishLost - dgPenLost);
+
+    // Save high score
+    const hs = saveHighScore(selectedContract.id, adjustedCapture, revenue, gr.g);
+
+    setRoundStats({
+      revenue, lostRevenue, penalties,
+      perishDelivered, perishExpired,
+      dgCleared, dgBreaches,
+      inboundCollected, outboundDelivered,
+      whEff, hadWarning, eventHistory,
+      // New fields
+      contract: selectedContract,
+      potentialRevenue,
+      capturePct,
+      adjustedCapture,
+      gr,                        // grade object
+      perishLost, dgPenLost, obstaclesLost, missedCargo,
+      highScore: hs,
+    });
+  }, [phase]);
+
+  // ============================================================
+  // DERIVED HUD VALUES
+  // ============================================================
+  const fleetBonus   = activeEvent?.id === "FLEET_SUPPORT" ? 3 : 0;
+  const effectiveCap = VEHICLE_CAPACITY + fleetBonus;
+  const loadCap = truckLoad.reduce((s, c) => s + c.actualCapacity, 0);
+  const loadPct = Math.round((loadCap / effectiveCap) * 100);
+  const whCount = warehouse.length;
+  const whPct   = Math.round((whCount / WAREHOUSE_CAPACITY) * 100);
+  const whColor = whPct >= 75 ? "#F87171" : whPct >= 60 ? "#F97316" : "#38BDF8";
+
+  // HUD sub-status string
+  const modeStatus = mode === "inbound"
+    ? "INBOUND"
+    : outboundCargoLoaded
+      ? "DELIVER CARGO"
+      : "LOAD AT WAREHOUSE";
+
+  const modeColor = mode === "inbound" ? "#4ADE80"
+    : outboundCargoLoaded ? "#FFD700" : "#F97316";
+
+  // delivery zones fully active only when outbound + cargo loaded
+  const deliveryZonesActive = mode === "outbound" && outboundCargoLoaded;
+
+  // ============================================================
+  // CONTRACT SELECTION SCREEN
+  // ============================================================
+  if (phase === "contract") {
+    return (
+      <div style={{
+        minHeight: "100vh", background: "#0a0a0f",
+        display: "flex", flexDirection: "column", alignItems: "center",
+        fontFamily: "'Courier New', monospace", color: "#fff",
+        padding: "20px 16px", overflowY: "auto",
+        backgroundImage: "radial-gradient(ellipse at 50% 0%, #1a1a3e 0%, #0a0a0f 60%)",
+      }}>
+        <div style={{ fontSize: 11, letterSpacing: 6, color: "#888", marginBottom: 6, marginTop: 8 }}>
+          LOGISTICS ARCADE
+        </div>
+        <div style={{
+          fontSize: "clamp(24px, 8vw, 42px)", fontWeight: 900,
+          background: "linear-gradient(135deg, #FFD700, #FF8C00)",
+          WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+          letterSpacing: -1, marginBottom: 4,
+        }}>SELECT CONTRACT</div>
+        <div style={{ fontSize: 11, color: "#555", marginBottom: 20, letterSpacing: 2 }}>
+          Choose your operational brief
+        </div>
+
+        {CONTRACTS.map(ct => {
+          const isSelected = selectedContract.id === ct.id;
+          const hs = loadHighScores()[ct.id];
+          return (
+            <div key={ct.id}
+              onClick={() => setSelectedContract(ct)}
+              style={{
+                background: isSelected ? "#111828" : "#0d0d14",
+                border: `2px solid ${isSelected ? ct.diffColor : "#1e1e2e"}`,
+                borderRadius: 12, padding: "14px 18px",
+                maxWidth: 340, width: "100%", marginBottom: 10,
+                cursor: "pointer", transition: "border-color 0.15s",
+              }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 20 }}>{ct.icon}</span>
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: isSelected ? ct.diffColor : "#ccc", letterSpacing: 1 }}>
+                      {ct.name}
+                    </div>
+                    <div style={{ fontSize: 9, color: ct.diffColor, letterSpacing: 2, marginTop: 1 }}>
+                      {ct.difficulty}
+                    </div>
+                  </div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontSize: 11, color: "#FFD700", fontWeight: 700 }}>
+                    ×{ct.revMod.toFixed(2)} REV
+                  </div>
+                  {hs && (
+                    <div style={{ fontSize: 9, color: "#555", marginTop: 2 }}>
+                      Best {hs.bestGrade} · {hs.bestCapture}%
+                    </div>
+                  )}
+                </div>
+              </div>
+              <div style={{ fontSize: 11, color: "#666", lineHeight: 1.5, marginBottom: 6 }}>{ct.desc}</div>
+              <div style={{ fontSize: 10, color: "#444", fontStyle: "italic" }}>"{ct.dispatch}"</div>
+              {isSelected && (
+                <div style={{ marginTop: 8, fontSize: 9, color: "#555", display: "flex", gap: 12 }}>
+                  <span>S≥{ct.grades.S}%</span>
+                  <span>A≥{ct.grades.A}%</span>
+                  <span>B≥{ct.grades.B}%</span>
+                  <span>C≥{ct.grades.C}%</span>
+                </div>
+              )}
+            </div>
+          );
+        })}
+
+        <div style={{ display: "flex", gap: 12, marginTop: 8, marginBottom: 20 }}>
+          <button onClick={() => startRound(selectedContract)} style={{
+            background: "linear-gradient(135deg, #FFD700, #FF8C00)",
+            border: "none", borderRadius: 10, padding: "14px 40px",
+            fontSize: 16, fontWeight: 900, color: "#000", letterSpacing: 2,
+            cursor: "pointer", boxShadow: "0 0 30px rgba(255,165,0,0.3)",
+            textTransform: "uppercase",
+          }}>START RUN</button>
+          <button onClick={() => setPhase("title")} style={{
+            background: "transparent", border: "1px solid #333", borderRadius: 10,
+            padding: "14px 20px", fontSize: 13, color: "#555", cursor: "pointer",
+          }}>← BACK</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================
+  // TITLE SCREEN
+  // ============================================================
+  if (phase === "title") {
+    return (
+      <div style={{
+        minHeight: "100vh", background: "#0a0a0f",
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        fontFamily: "'Courier New', monospace", color: "#fff", padding: 20,
+        backgroundImage: "radial-gradient(ellipse at 50% 0%, #1a1a3e 0%, #0a0a0f 70%)",
+      }}>
+        <div style={{ fontSize: 11, letterSpacing: 6, color: "#888", marginBottom: 8 }}>LOGISTICS ARCADE</div>
+        <div style={{
+          fontSize: "clamp(42px, 12vw, 80px)", fontWeight: 900, letterSpacing: -2,
+          background: "linear-gradient(135deg, #FFD700, #FF8C00)",
+          WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent",
+          lineHeight: 1, marginBottom: 4,
+        }}>CARGO RUN</div>
+        <div style={{ fontSize: 13, color: "#666", marginBottom: 32, letterSpacing: 2 }}>
+          COLLECT · STORE · DELIVER
+        </div>
+
+        {/* HOW TO PLAY */}
+        <div style={{
+          background: "#111", border: "1px solid #222", borderRadius: 12,
+          padding: "18px 20px", maxWidth: 320, width: "100%", marginBottom: 14,
+        }}>
+          <div style={{ fontSize: 10, color: "#FFD700", letterSpacing: 3, marginBottom: 12 }}>HOW TO PLAY</div>
+          {[
+            ["🚛", "You control the blue truck — collect inbound cargo"],
+            ["🏭", "Return to WH (warehouse) — cargo is stored"],
+            ["📦", "Warehouse holds 20 units — watch the bar"],
+            ["🔄", "Tap OUTBOUND → visit WH to load → drive to OUT zones"],
+            ["🧊", "COLD — earns less revenue the longer it sits in storage"],
+            ["⚠",  "DG! — compliance fine if stored longer than ~55 seconds"],
+          ].map(([icon, text]) => (
+            <div key={text} style={{ display: "flex", gap: 10, marginBottom: 8, fontSize: 12, color: "#aaa", alignItems: "flex-start" }}>
+              <span style={{ fontSize: 14, minWidth: 20 }}>{icon}</span>
+              <span>{text}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* CARGO TYPES */}
+        <div style={{
+          background: "#111", border: "1px solid #222", borderRadius: 12,
+          padding: "14px 20px", maxWidth: 320, width: "100%", marginBottom: 14,
+        }}>
+          <div style={{ fontSize: 10, color: "#FFD700", letterSpacing: 3, marginBottom: 10 }}>CARGO TYPES</div>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {Object.entries(CARGO_TYPES).map(([key, val]) => (
+              <div key={key} style={{
+                background: val.color, color: val.textColor,
+                padding: "3px 8px", borderRadius: 4, fontSize: 11, fontWeight: 700, letterSpacing: 1,
+              }}>{val.label}</div>
+            ))}
+          </div>
+          <div style={{ marginTop: 10, fontSize: 11, color: "#555", lineHeight: 1.6 }}>
+            STD = standard · COLD = perishable · DG! = dangerous goods<br/>
+            BIG = oversized · ??? = misdeclared (true size revealed on pickup)
+          </div>
+        </div>
+
+        {/* MOVING HAZARDS */}
+        <div style={{
+          background: "#111", border: "1px solid #222", borderRadius: 12,
+          padding: "14px 20px", maxWidth: 320, width: "100%", marginBottom: 20,
+        }}>
+          <div style={{ fontSize: 10, color: "#F87171", letterSpacing: 3, marginBottom: 10 }}>MOVING HAZARDS</div>
+          {[
+            ["🚧", "ROADWORKS",  "Blocks route — collision causes delay + £25 fine"],
+            ["🚗", "TRAFFIC",    "Moving vehicle — collision causes delay + £25 fine"],
+            ["🏗️", "HEAVY PLANT","Construction hazard — collision freezes truck + £25 fine"],
+          ].map(([icon, name, desc]) => (
+            <div key={name} style={{ display: "flex", gap: 10, marginBottom: 10, alignItems: "flex-start" }}>
+              <span style={{ fontSize: 16, minWidth: 22 }}>{icon}</span>
+              <div>
+                <div style={{ fontSize: 11, color: "#F87171", fontWeight: 700, letterSpacing: 1 }}>{name}</div>
+                <div style={{ fontSize: 11, color: "#666", lineHeight: 1.5 }}>{desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* PERFORMANCE GRADES */}
+        <div style={{
+          background: "#111", border: "1px solid #222", borderRadius: 12,
+          padding: "14px 20px", maxWidth: 320, width: "100%", marginBottom: 20,
+        }}>
+          <div style={{ fontSize: 10, color: "#FFD700", letterSpacing: 3, marginBottom: 10 }}>PERFORMANCE GRADES</div>
+          {[
+            ["S", "#FFD700", "90–100", "LOGISTICS WIZARD"],
+            ["A", "#4ADE80", "75–89",  "OPERATIONS HERO"],
+            ["B", "#38BDF8", "55–74",  "RELIABLE OPERATOR"],
+            ["C", "#FCD34D", "35–54",  "MANAGED SOMEHOW"],
+            ["D", "#F87171", "20–34",  "CUSTOMER COMPLAINT PENDING"],
+            ["F", "#DC2626", "0–19",   "PLEASE ATTEND RETRAINING"],
+          ].map(([g, color, range, name]) => (
+            <div key={g} style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 7 }}>
+              <div style={{
+                width: 22, height: 22, borderRadius: 4, border: `1px solid ${color}`,
+                display: "flex", alignItems: "center", justifyContent: "center",
+                fontSize: 12, fontWeight: 900, color, flexShrink: 0,
+              }}>{g}</div>
+              <div style={{ flex: 1 }}>
+                <span style={{ fontSize: 11, color, fontWeight: 700 }}>{name}</span>
+                <span style={{ fontSize: 10, color: "#444", marginLeft: 6 }}>{range}%</span>
+              </div>
+            </div>
+          ))}
+          <div style={{ marginTop: 10, fontSize: 10, color: "#444", lineHeight: 1.6 }}>
+            Score based on: revenue · cargo collected · deliveries<br/>
+            penalties avoided · warehouse efficiency · cargo condition
+          </div>
+        </div>
+
+        <button onClick={() => setPhase("contract")} style={{
+          background: "linear-gradient(135deg, #FFD700, #FF8C00)",
+          border: "none", borderRadius: 10, padding: "16px 48px",
+          fontSize: 18, fontWeight: 900, color: "#000", letterSpacing: 2,
+          cursor: "pointer", boxShadow: "0 0 40px rgba(255,165,0,0.4)",
+          textTransform: "uppercase",
+        }}>SELECT CONTRACT</button>
+
+        <div style={{ marginTop: 18, fontSize: 11, color: "#444", textAlign: "center" }}>
+          Arrow keys or D-pad · {ROUND_DURATION}s per round
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================
+  // ROUND END SCREEN
+  // ============================================================
+  if (phase === "roundend" && roundStats) {
+    const gr = roundStats.gr || grade(roundStats.adjustedCapture || 0);
+    return (
+      <div style={{
+        minHeight: "100vh", background: "#0a0a0f",
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        fontFamily: "'Courier New', monospace", color: "#fff", padding: 20,
+        backgroundImage: "radial-gradient(ellipse at 50% 100%, #1a1a3e 0%, #0a0a0f 60%)",
+        overflowY: "auto",
+      }}>
+        <div style={{ fontSize: 11, letterSpacing: 6, color: "#888", marginBottom: 14 }}>LOGISTICS ARCADE · END OF RUN</div>
+
+        {/* Grade badge + name + dispatch comment */}
+        <div style={{ textAlign: "center", marginBottom: 18 }}>
+          <div style={{
+            width: 76, height: 76, borderRadius: "50%",
+            background: `radial-gradient(circle, ${gr.color}33, transparent)`,
+            border: `3px solid ${gr.color}`,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            fontSize: 38, fontWeight: 900, color: gr.color,
+            margin: "0 auto 8px",
+            boxShadow: `0 0 40px ${gr.color}66`,
+          }}>{gr.g}</div>
+          <div style={{ fontSize: 13, fontWeight: 700, color: gr.color, letterSpacing: 2, marginBottom: 6 }}>
+            {gr.name}
+          </div>
+          {gr.g === "S" && (
+            <div style={{ fontSize: 11, color: "#FFD700", letterSpacing: 1, marginBottom: 6, fontStyle: "italic" }}>
+              Promoted to Temporary Logistics Genius.
+            </div>
+          )}
+          <div style={{ fontSize: 12, color: "#555", fontStyle: "italic", maxWidth: 280, margin: "0 auto" }}>
+            "{pickDispatch(gr.g)}"
+          </div>
+        </div>
+
+        {/* Revenue capture hero block */}
+        <div style={{
+          background: "#111", border: "1px solid #1e1e2e", borderRadius: 14,
+          padding: "16px 20px", maxWidth: 340, width: "100%", marginBottom: 12,
+        }}>
+          {/* Contract row */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+            marginBottom: 12, borderBottom: "1px solid #1a1a2a", paddingBottom: 10 }}>
+            <span style={{ fontSize: 10, color: "#555", letterSpacing: 2 }}>CONTRACT</span>
+            <span style={{ fontSize: 12, fontWeight: 700, color: roundStats.contract?.diffColor || "#fff" }}>
+              {roundStats.contract?.icon} {roundStats.contract?.name}
+            </span>
+          </div>
+          {[
+            ["POTENTIAL REVENUE", `£${roundStats.potentialRevenue.toLocaleString()}`, "#888"],
+            ["ACTUAL REVENUE",    `£${roundStats.revenue.toLocaleString()}`,          "#FFD700"],
+            ["VALUE LEFT BEHIND", `£${Math.max(0, roundStats.potentialRevenue - roundStats.revenue).toLocaleString()}`, "#F87171"],
+          ].map(([label, val, color]) => (
+            <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+              marginBottom: 10, borderBottom: "1px solid #1a1a2a", paddingBottom: 10 }}>
+              <span style={{ fontSize: 10, color: "#555", letterSpacing: 2 }}>{label}</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color }}>{val}</span>
+            </div>
+          ))}
+          {/* Capture rate bar */}
+          <div style={{ marginTop: 4 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+              <span style={{ fontSize: 10, color: "#555", letterSpacing: 2 }}>REVENUE CAPTURE</span>
+              <span style={{ fontSize: 15, fontWeight: 700, color: roundStats.gr?.color || "#fff" }}>
+                {roundStats.capturePct}%
+              </span>
+            </div>
+            <div style={{ height: 6, background: "#1a1a2a", borderRadius: 3, overflow: "hidden" }}>
+              <div style={{ height: "100%", width: `${roundStats.capturePct}%`,
+                background: `linear-gradient(90deg, ${roundStats.gr?.color || "#4ADE80"}, ${roundStats.gr?.color || "#4ADE80"}88)`,
+                borderRadius: 3, transition: "width 0.5s" }} />
+            </div>
+          </div>
+        </div>
+
+        {/* Ops stats */}
+        <div style={{
+          background: "#111", border: "1px solid #1e1e2e", borderRadius: 14,
+          padding: "16px 20px", maxWidth: 340, width: "100%", marginBottom: 12,
+        }}>
+          {[
+            ["PENALTIES PAID",        `£${roundStats.penalties}`,          "#F87171"],
+            ["PERISHABLES DELIVERED",  roundStats.perishDelivered,         "#38BDF8"],
+            ["PERISHABLES EXPIRED",    roundStats.perishExpired,           "#F97316"],
+            ["DG CLEARED",             roundStats.dgCleared,               "#4ADE80"],
+            ["DG STORAGE BREACHES",    roundStats.dgBreaches,              "#F87171"],
+            ["INBOUND COLLECTED",      roundStats.inboundCollected,        "#A78BFA"],
+            ["OUTBOUND DELIVERED",     roundStats.outboundDelivered,       "#4ADE80"],
+            ["WAREHOUSE EFFICIENCY",   `${roundStats.whEff}%`,             "#38BDF8"],
+          ].map(([label, val, color]) => (
+            <div key={label} style={{ display: "flex", justifyContent: "space-between", alignItems: "center",
+              marginBottom: 8, borderBottom: "1px solid #111820", paddingBottom: 8 }}>
+              <span style={{ fontSize: 10, color: "#555", letterSpacing: 2 }}>{label}</span>
+              <span style={{ fontSize: 13, fontWeight: 700, color }}>{val}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* High score */}
+        {roundStats.highScore && (
+          <div style={{ fontSize: 11, color: "#555", marginBottom: 10, textAlign: "center" }}>
+            Best capture: {roundStats.highScore.bestCapture}% ·
+            Best grade: {roundStats.highScore.bestGrade} ·
+            Best revenue: £{roundStats.highScore.bestRevenue.toLocaleString()}
+          </div>
+        )}
+
+        {/* HOW TO IMPROVE */}
+        {(() => {
+          const tips = [];
+          const gap = roundStats.potentialRevenue - roundStats.revenue;
+          if (gap > 200)
+            tips.push(`£${gap.toLocaleString()} left uncaptured — that's your gap to the next grade`);
+          if (roundStats.perishExpired > 0)
+            tips.push(`Perishables expired: £${roundStats.perishLost.toLocaleString()} lost — switch Outbound earlier`);
+          if (roundStats.dgBreaches > 0)
+            tips.push(`DG breaches cost £${roundStats.dgPenLost} — deliver DG! cargo within ~55 seconds`);
+          if (roundStats.penalties > 0)
+            tips.push(`Hazard fines: £${roundStats.obstaclesLost} — avoid moving obstacles`);
+          if (roundStats.whEff < 60)
+            tips.push(`Warehouse efficiency ${roundStats.whEff}% — run more outbound deliveries to free space`);
+          if (roundStats.outboundDelivered === 0)
+            tips.push("No outbound deliveries — COLD and DG! cargo requires outbound for full revenue");
+          if (tips.length === 0) return null;
+          return (
+            <div style={{
+              background: "#0d0d18", border: "1px solid #1e1e2e", borderRadius: 12,
+              padding: "14px 20px", maxWidth: 340, width: "100%", marginBottom: 14,
+            }}>
+              <div style={{ fontSize: 10, color: "#888", letterSpacing: 3, marginBottom: 10 }}>HOW TO IMPROVE</div>
+              {tips.map((t, i) => (
+                <div key={i} style={{ fontSize: 11, color: "#666", marginBottom: 7, lineHeight: 1.5 }}>
+                  › {t}
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+
+        {roundStats.perishExpired > 0 && !roundStats.hadWarning && (
+          <div style={{ fontSize: 11, color: "#888", marginBottom: 10, textAlign: "center", maxWidth: 300 }}>
+            Note: Perishable expiry occurred before any warning could be issued. No outbound opportunity was available.
+          </div>
+        )}
+
+        <div style={{ fontSize: 12, color: "#555", marginBottom: 18, fontStyle: "italic", textAlign: "center" }}>
+          "{END_QUIPS[Math.floor(Math.random() * END_QUIPS.length)]}"
+        </div>
+
+        {/* OPERATIONAL EVENTS HISTORY */}
+        {Object.keys(roundStats.eventHistory).length > 0 && (
+          <div style={{
+            background: "#0d0d18", border: "1px solid #1e1e2e", borderRadius: 12,
+            padding: "14px 20px", maxWidth: 340, width: "100%", marginBottom: 14,
+          }}>
+            <div style={{ fontSize: 10, color: "#888", letterSpacing: 3, marginBottom: 10 }}>OPERATIONAL EVENTS</div>
+            {Object.entries(roundStats.eventHistory).map(([evId, count]) => {
+              const def = EVENTS.find(e => e.id === evId);
+              if (!def) return null;
+              return (
+                <div key={evId} style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                  <span style={{ fontSize: 11, color: def.positive ? "#4ADE80" : "#F97316" }}>
+                    {def.icon} {def.label}
+                  </span>
+                  <span style={{ fontSize: 11, color: "#555" }}>×{count}</span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div style={{ display: "flex", gap: 12 }}>
+          <button onClick={() => startRound(roundStats?.contract)} style={{
+            background: "linear-gradient(135deg, #FFD700, #FF8C00)",
+            border: "none", borderRadius: 10, padding: "14px 36px",
+            fontSize: 16, fontWeight: 900, color: "#000", letterSpacing: 2,
+            cursor: "pointer", textTransform: "uppercase",
+          }}>RETRY</button>
+          <button onClick={() => setPhase("contract")} style={{
+            background: "transparent", border: "1px solid #F97316", borderRadius: 10,
+            padding: "14px 24px", fontSize: 14, color: "#F97316", cursor: "pointer",
+          }}>CONTRACTS</button>
+          <button onClick={() => setPhase("title")} style={{
+            background: "transparent", border: "1px solid #333", borderRadius: 10,
+            padding: "14px 24px", fontSize: 14, color: "#666", cursor: "pointer",
+          }}>MENU</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ============================================================
+  // OUTBOUND MODAL (alert-triggered)
+  // ============================================================
+  const OutboundModal = outboundModal && (
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)",
+      display: "flex", alignItems: "center", justifyContent: "center",
+      zIndex: 200, padding: 20,
+    }}>
+      <div style={{
+        background: "#111", border: "2px solid #F97316", borderRadius: 14,
+        padding: "24px 28px", maxWidth: 300, width: "100%", textAlign: "center",
+        fontFamily: "'Courier New', monospace",
+        boxShadow: "0 0 50px rgba(249,115,22,0.3)",
+      }}>
+        <div style={{ fontSize: 11, letterSpacing: 3, color: "#F97316", marginBottom: 8 }}>⚠ OUTBOUND REQUIRED</div>
+        <div style={{ fontSize: 13, color: "#aaa", marginBottom: 6, lineHeight: 1.6 }}>
+          Warehouse pressure or time-sensitive cargo requires action.
+        </div>
+        <div style={{ fontSize: 11, color: "#666", marginBottom: 20, lineHeight: 1.5 }}>
+          If you start outbound: return to warehouse to collect cargo, then drive to a green OUT zone to deliver.
+        </div>
+        <div style={{ display: "flex", gap: 10, justifyContent: "center" }}>
+          <button onClick={switchToOutbound} style={{
+            background: "#F97316", border: "none", borderRadius: 8,
+            padding: "10px 20px", fontSize: 13, fontWeight: 700, color: "#000",
+            cursor: "pointer", letterSpacing: 1,
+          }}>START OUTBOUND</button>
+          <button onClick={() => setOutboundModal(false)} style={{
+            background: "transparent", border: "1px solid #333", borderRadius: 8,
+            padding: "10px 16px", fontSize: 12, color: "#666", cursor: "pointer",
+          }}>CONTINUE INBOUND</button>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ============================================================
+  // GAME SCREEN
+  // ============================================================
+  return (
+    <div style={{
+      minHeight: "100vh", background: "#0a0a0f",
+      display: "flex", flexDirection: "column", alignItems: "center",
+      fontFamily: "'Courier New', monospace", color: "#fff",
+      userSelect: "none", overflow: "hidden",
+    }}>
+
+      {OutboundModal}
+
+      {/* HUD */}
+      <div style={{
+        width: "100%", maxWidth: 600, padding: "5px 10px",
+        display: "flex", gap: 5, flexWrap: "wrap", alignItems: "center",
+        borderBottom: "1px solid #1a1a2a",
+      }}>
+        <HudItem label="£" value={revenue.toLocaleString()} color="#FFD700" />
+        <HudItem label="LOAD" value={`${loadPct}%`} color={loadPct > 80 ? "#F87171" : "#4ADE80"} />
+        <HudItem label="WHSE" value={`${whPct}%`} color={whColor} />
+        <HudItem label="TIME" value={timer} color={timer < 20 ? "#F87171" : "#fff"} />
+        <HudItem label="MAP" value={mapCargos.length} color="#A78BFA" />
+        <HudItem label="CAPT" value={`${Math.min(100, Math.round((revenue / Math.max(potentialRevenue, 1)) * 100))}%`}
+          color={revenue / Math.max(potentialRevenue, 1) >= 0.75 ? "#4ADE80" : "#F97316"} />
+
+        {/* Mode pill + manual toggle */}
+        <div style={{ display: "flex", alignItems: "center", gap: 5, marginLeft: "auto" }}>
+          <div style={{
+            background: "#1a1a2a", border: `1px solid ${modeColor}`,
+            borderRadius: 6, padding: "3px 8px", display: "flex", flexDirection: "column", alignItems: "center",
+          }}>
+            <div style={{ fontSize: 7, color: "#555", letterSpacing: 2 }}>MODE</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: modeColor, letterSpacing: 1 }}>{modeStatus}</div>
+          </div>
+          {mode === "inbound"
+            ? <button onClick={switchToOutbound} style={{
+                background: "#1a1200", border: "1px solid #F97316", borderRadius: 6,
+                padding: "4px 8px", fontSize: 10, color: "#F97316", cursor: "pointer",
+                fontFamily: "'Courier New', monospace", fontWeight: 700, letterSpacing: 1,
+              }}>OUTBOUND ▶</button>
+            : <button onClick={switchToInbound} style={{
+                background: "#001a00", border: "1px solid #4ADE80", borderRadius: 6,
+                padding: "4px 8px", fontSize: 10, color: "#4ADE80", cursor: "pointer",
+                fontFamily: "'Courier New', monospace", fontWeight: 700, letterSpacing: 1,
+              }}>◀ INBOUND</button>
+          }
+        </div>
+      </div>
+
+      {/* ALERTS BAR */}
+      {alerts.length > 0 && (
+        <div style={{
+          width: "100%", maxWidth: 600,
+          background: "#1a0f00", borderBottom: "1px solid #F97316",
+          padding: "3px 10px",
+        }}>
+          {alerts.map((a, i) => (
+            <div key={i} style={{ fontSize: 10, color: "#F97316", letterSpacing: 1, lineHeight: 1.8 }}>{a}</div>
+          ))}
+        </div>
+      )}
+
+      {/* OPERATIONAL EVENT BANNER */}
+      {activeEvent && (
+        <div style={{
+          width: "100%", maxWidth: 600,
+          background: activeEvent.positive ? "#001a0a" : "#1a0800",
+          borderBottom: `1px solid ${activeEvent.positive ? "#4ADE80" : "#F97316"}`,
+          padding: "4px 10px",
+          display: "flex", justifyContent: "space-between", alignItems: "center",
+        }}>
+          <div>
+            <span style={{ fontSize: 14, marginRight: 6 }}>{activeEvent.icon}</span>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 2,
+              color: activeEvent.positive ? "#4ADE80" : "#F97316" }}>
+              {activeEvent.label}
+            </span>
+          </div>
+          <div style={{ fontSize: 10, color: "#555", letterSpacing: 1 }}>
+            {activeEvent.remaining}s remaining
+          </div>
+        </div>
+      )}
+
+      {/* POPUP */}
+      {popup && (
+        <div style={{
+          position: "fixed", top: "14%", left: "50%", transform: "translateX(-50%)",
+          background: "#1a1a2e", border: "1px solid #FFD700", borderRadius: 8,
+          padding: "10px 18px", fontSize: 12, color: "#FFD700",
+          zIndex: 100, maxWidth: 290, textAlign: "center", letterSpacing: 1,
+          boxShadow: "0 0 30px rgba(255,215,0,0.2)",
+          animation: "popIn 0.15s ease",
+        }}>
+          {popup.msg}
+        </div>
+      )}
+
+      {/* WAREHOUSE BAR */}
+      <div style={{ width: "100%", maxWidth: 600, padding: "3px 10px" }}>
+        <div style={{ display: "flex", gap: 2 }}>
+          {Array.from({ length: WAREHOUSE_CAPACITY }).map((_, i) => {
+            const item = warehouse[i];
+            let color = "#1a1a2a";
+            if (item) {
+              if (CARGO_TYPES[item.type].perishable) {
+                color = (item.storedSecs || 0) / PERISH_EXPIRE_SECS > 0.55 ? "#F87171" : "#38BDF8";
+              } else if (CARGO_TYPES[item.type].dg) {
+                color = (item.storedSecs || 0) / DG_BREACH_SECS > 0.55 ? "#F87171" : "#F97316";
+              } else {
+                color = "#4ADE80";
+              }
+            }
+            return <div key={i} style={{ flex: 1, height: 7, borderRadius: 1, background: color, transition: "background 0.4s" }} />;
+          })}
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", marginTop: 1 }}>
+          <div style={{ fontSize: 8, color: "#555", letterSpacing: 1 }}>WAREHOUSE {whCount}/{WAREHOUSE_CAPACITY}</div>
+          <div style={{ fontSize: 8, color: "#555", letterSpacing: 1 }}>TRUCK {loadCap}/{VEHICLE_CAPACITY}</div>
+        </div>
+      </div>
+
+      {/* GAME CANVAS */}
+      <div style={{
+        width: Math.min(W, window.innerWidth - 4),
+        height: Math.min(W, window.innerWidth - 4) * (H / W),
+        overflow: "hidden", margin: "2px 0", flex: "0 0 auto",
+      }}>
+        <GameCanvas
+          map={map}
+          player={player}
+          cargos={mapCargos}
+          movers={movers}
+          load={truckLoad}
+          frozen={frozen}
+          deliveryZonesActive={deliveryZonesActive}
+          outboundMode={mode === "outbound"}
+          warehouse={warehouse}
+        />
+      </div>
+
+      {/* TRUCK LOAD BAR */}
+      <div style={{ width: "100%", maxWidth: 600, padding: "2px 10px 3px" }}>
+        <div style={{ display: "flex", gap: 2 }}>
+          {Array.from({ length: effectiveCap }).map((_, i) => {
+            const filled = i < loadCap;
+            const col = filled
+              ? (outboundCargoLoaded ? "#FFD700" : (loadPct > 80 ? "#F87171" : "#4ADE80"))
+              : (i >= VEHICLE_CAPACITY ? "#1a2a0a" : "#1a1a2a"); // bonus slots green-tinted
+            return (
+              <div key={i} style={{
+                flex: 1, height: 8, borderRadius: 2,
+                background: col, border: "1px solid #222", transition: "background 0.2s",
+              }} />
+            );
+          })}
+        </div>
+      </div>
+
+      {/* D-PAD */}
+      <div style={{ padding: "5px 0 10px", display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+        <DpadButton onClick={() => handleDpad({ x:0, y:-1 })} label="▲" />
+        <div style={{ display: "flex", gap: 4 }}>
+          <DpadButton onClick={() => handleDpad({ x:-1, y:0 })} label="◄" />
+          <div style={{
+            width: 52, height: 52, background: "#111", borderRadius: 8,
+            border: "1px solid #1e1e2e", display: "flex", alignItems: "center", justifyContent: "center",
+          }}>
+            <span style={{ fontSize: 18 }}>🚚</span>
+          </div>
+          <DpadButton onClick={() => handleDpad({ x:1, y:0 })} label="►" />
+        </div>
+        <DpadButton onClick={() => handleDpad({ x:0, y:1 })} label="▼" />
+      </div>
+
+      <style>{`
+        @keyframes popIn {
+          from { opacity: 0; transform: translateX(-50%) scale(0.9); }
+          to   { opacity: 1; transform: translateX(-50%) scale(1); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
+// ============================================================
+// GAME CANVAS
+// ============================================================
+function GameCanvas({ map, player, cargos, movers, load, frozen,
+                      deliveryZonesActive, outboundMode, warehouse }) {
+  const scale = Math.min(1, (typeof window !== "undefined" ? window.innerWidth - 4 : 600) / W);
+  const sw = W * scale, sh = H * scale;
+
+  return (
+    <svg width={sw} height={sh} viewBox={`0 0 ${W} ${H}`} style={{ display: "block" }}>
+      <rect width={W} height={H} fill="#0d0d14" />
+
+      {map.map((row, r) => row.map((cell, c) => {
+        if (cell === 1) return (
+          <rect key={`${r}-${c}`} x={c*TILE} y={r*TILE} width={TILE} height={TILE}
+            fill="#111118" stroke="#0d0d14" strokeWidth={1} />
+        );
+        if (cell === 0) return (
+          <g key={`${r}-${c}`}>
+            <rect x={c*TILE} y={r*TILE} width={TILE} height={TILE} fill="#16161f" />
+            <rect x={c*TILE+TILE/2-1} y={r*TILE+4} width={2} height={TILE/3} fill="#222230" />
+          </g>
+        );
+        if (cell === 2) {
+          const whFill      = warehouse.length / WAREHOUSE_CAPACITY;
+          const tint        = whFill >= 0.75 ? "#2a1010" : whFill >= 0.60 ? "#1f1808" : "#1a1a30";
+          const borderColor = whFill >= 0.75 ? "#F87171" : whFill >= 0.60 ? "#F97316" : "#FFD700";
+          // Highlight WH tile when outbound mode and no cargo loaded yet
+          const whHighlight = outboundMode && warehouse.length > 0;
+          return (
+            <g key={`${r}-${c}`}>
+              <rect x={c*TILE} y={r*TILE} width={TILE} height={TILE}
+                fill={whHighlight ? "#1a1a38" : tint} />
+              <rect x={c*TILE+2} y={r*TILE+2} width={TILE-4} height={TILE-4}
+                fill="none"
+                stroke={whHighlight ? "#A0A0FF" : borderColor}
+                strokeWidth={whHighlight ? 2 : 1.5}
+                strokeDasharray="4 2" />
+              <text x={c*TILE+TILE/2} y={r*TILE+TILE/2+1}
+                textAnchor="middle" dominantBaseline="middle"
+                fill={whHighlight ? "#A0A0FF" : borderColor}
+                fontSize={9} fontFamily="'Courier New'" fontWeight="700">WH</text>
+            </g>
+          );
+        }
+        if (cell === 3) {
+          // 3 visual states: inactive (dim) | outbound no cargo (faint) | active (green)
+          const bg     = deliveryZonesActive ? "#1a2a1a" : outboundMode ? "#141420" : "#141414";
+          const stroke = deliveryZonesActive ? "#4ADE80" : outboundMode ? "#444488" : "#2a2a2a";
+          const label  = deliveryZonesActive ? "#4ADE80" : outboundMode ? "#555577" : "#333";
+          return (
+            <g key={`${r}-${c}`}>
+              <rect x={c*TILE} y={r*TILE} width={TILE} height={TILE} fill={bg} />
+              <rect x={c*TILE+2} y={r*TILE+2} width={TILE-4} height={TILE-4}
+                fill="none" stroke={stroke} strokeWidth={deliveryZonesActive ? 2 : 1} strokeDasharray="3 3" />
+              <text x={c*TILE+TILE/2} y={r*TILE+TILE/2+1}
+                textAnchor="middle" dominantBaseline="middle"
+                fill={label} fontSize={8} fontFamily="'Courier New'" fontWeight="700">OUT</text>
+            </g>
+          );
+        }
+        return null;
+      }))}
+
+      {/* Map cargo */}
+      {cargos.map(c => {
+        const type = CARGO_TYPES[c.type];
+        const cx = c.x*TILE+TILE/2, cy = c.y*TILE+TILE/2;
+        return (
+          <g key={c.id}>
+            <rect x={c.x*TILE+6} y={c.y*TILE+6} width={TILE-12} height={TILE-12}
+              rx={4} fill={type.color} stroke="rgba(255,255,255,0.1)" strokeWidth={1} />
+            <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle"
+              fill={type.textColor} fontSize={9} fontFamily="'Courier New'" fontWeight="700">{type.label}</text>
+          </g>
+        );
+      })}
+
+      {/* Movers */}
+      {movers.map(m => (
+        <text key={m.id} x={m.x*TILE+TILE/2} y={m.y*TILE+TILE/2}
+          textAnchor="middle" dominantBaseline="middle" fontSize={20}>{m.label}</text>
+      ))}
+
+      {/* Player truck — blue, distinct from cargo boxes */}
+      {(() => {
+        const px = player.x * TILE;
+        const py = player.y * TILE;
+        const cx = px + TILE / 2;
+        const cy = py + TILE / 2;
+        const facingRight = player.dir.x >= 0 && !(player.dir.x === 0 && player.dir.y < 0);
+        const truckColor  = frozen > 0 ? "#F97316" : "#3B82F6";  // blue normally, orange when frozen
+        const cabColor    = frozen > 0 ? "#EA580C" : "#1D4ED8";
+        const glowColor   = frozen > 0 ? "#F97316" : "#3B82F6";
+
+        // Trailer body
+        const trailerX  = facingRight ? px + 3 : px + 14;
+        const trailerW  = TILE - 17;
+        // Cab block (front of truck, direction-aware)
+        const cabX      = facingRight ? px + TILE - 14 : px + 3;
+
+        return (
+          <g>
+            {/* Glow ring — always visible for player tracking */}
+            <circle cx={cx} cy={cy} r={TILE / 2 + 3}
+              fill="none" stroke={glowColor} strokeWidth={1.5} opacity={frozen > 0 ? 0.9 : 0.4} />
+
+            {/* Drop shadow */}
+            <ellipse cx={cx} cy={py + TILE - 3} rx={TILE / 2 - 3} ry={3} fill="#000" opacity={0.35} />
+
+            {/* Trailer / cargo body */}
+            <rect x={trailerX} y={py + 10} width={trailerW} height={TILE - 18} rx={3}
+              fill={truckColor} stroke="#fff" strokeWidth={1.5} />
+
+            {/* Cargo slots on trailer */}
+            {load.slice(0, 4).map((_, i) => (
+              <rect key={i}
+                x={trailerX + 3 + i * ((trailerW - 6) / 4)} y={py + 14}
+                width={(trailerW - 10) / 4} height={TILE - 26}
+                rx={1} fill="#fff" opacity={0.15} />
+            ))}
+
+            {/* Cab block */}
+            <rect x={cabX} y={py + 8} width={11} height={TILE - 14} rx={4}
+              fill={cabColor} stroke="#fff" strokeWidth={1} />
+
+            {/* Cab windscreen */}
+            <rect x={cabX + 1} y={py + 10} width={9} height={6} rx={1}
+              fill="#93C5FD" opacity={0.8} />
+
+            {/* Wheels */}
+            <circle cx={px + 8}        cy={py + TILE - 5} r={4} fill="#1a1a1a" stroke="#555" strokeWidth={1} />
+            <circle cx={px + TILE - 8} cy={py + TILE - 5} r={4} fill="#1a1a1a" stroke="#555" strokeWidth={1} />
+          </g>
+        );
+      })()}
+    </svg>
+  );
+}
+
+// ============================================================
+// UI ATOMS
+// ============================================================
+function HudItem({ label, value, color }) {
+  return (
+    <div style={{
+      background: "#111", border: "1px solid #1e1e2e", borderRadius: 6,
+      padding: "3px 8px", display: "flex", flexDirection: "column",
+      alignItems: "center", minWidth: 44,
+    }}>
+      <div style={{ fontSize: 8, color: "#555", letterSpacing: 2 }}>{label}</div>
+      <div style={{ fontSize: 14, fontWeight: 700, color, lineHeight: 1.2 }}>{value}</div>
+    </div>
+  );
+}
+
+function DpadButton({ onClick, label }) {
+  return (
+    <button
+      onTouchStart={e => { e.preventDefault(); onClick(); }}
+      onMouseDown={onClick}
+      onTouchEnd={e => e.preventDefault()}
+      style={{
+        width: 52, height: 52, background: "#111", border: "1px solid #1e1e2e",
+        borderRadius: 8, color: "#FFD700", fontSize: 20, cursor: "pointer",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        WebkitTapHighlightColor: "transparent", touchAction: "none",
+      }}
+    >{label}</button>
+  );
+}
+
+
+    // Mount
+    const root = ReactDOM.createRoot(document.getElementById('root'));
+    root.render(React.createElement(CargoRun));
+  </script>
+</body>
+</html>

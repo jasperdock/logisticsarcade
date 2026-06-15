@@ -1,0 +1,1901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Container Stacker</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    background: #0a0e1a; font-family: 'Segoe UI', system-ui, sans-serif;
+    overflow: hidden; width: 100vw; height: 100vh;
+    display: flex; align-items: center; justify-content: center; touch-action: none;
+  }
+  #gameWrapper { position: relative; width: 100%; height: 100%; max-width: 480px; max-height: 100vh; overflow: hidden; }
+  canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+
+  .screen { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; padding: 2rem; text-align: center; }
+  .screen.hidden { display: none; }
+  /* How To Play screen */
+  #howToScreen { background: linear-gradient(180deg,rgba(5,10,25,.97),rgba(8,18,45,.95)); animation: screenFadeIn .35s ease-out; }
+  .htp-title { font-size: clamp(1.1rem,4.5vw,1.5rem); font-weight: 800; color: #5cc8ff; letter-spacing: 2px; text-transform: uppercase; margin-bottom: .2rem; text-shadow: 0 0 16px rgba(92,200,255,.4); }
+  .htp-sub { font-size: .58rem; color: rgba(92,200,255,.45); letter-spacing: 3px; text-transform: uppercase; margin-bottom: 1.2rem; }
+  .htp-rules { list-style: none; width: 100%; max-width: 300px; margin-bottom: 1rem; text-align: left; }
+  .htp-rules li { display: flex; align-items: flex-start; gap: .55rem; margin-bottom: .52rem; }
+  .htp-rules li .htp-icon { font-size: 1rem; flex-shrink: 0; width: 22px; text-align: center; margin-top: .02rem; }
+  .htp-rules li .htp-text { font-size: .72rem; color: rgba(255,255,255,.75); line-height: 1.45; }
+  .htp-rules li .htp-text strong { color: #fff; }
+  .htp-controls { background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08); border-radius: 10px; padding: .6rem .9rem; width: 100%; max-width: 300px; margin-bottom: 1rem; }
+  .htp-controls-title { font-size: .48rem; color: rgba(92,200,255,.45); text-transform: uppercase; letter-spacing: 2px; margin-bottom: .45rem; text-align: center; }
+  .htp-ctrl-row { display: flex; justify-content: space-around; gap: .4rem; flex-wrap: wrap; }
+  .htp-ctrl { display: flex; flex-direction: column; align-items: center; gap: .18rem; }
+  .htp-ctrl-key { background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.18); border-radius: 5px; padding: .18rem .45rem; font-size: .65rem; font-weight: 700; color: #fff; min-width: 28px; text-align: center; font-family: monospace; }
+  .htp-ctrl-lbl { font-size: .52rem; color: rgba(255,255,255,.38); }
+  #startScreen { background: linear-gradient(180deg,rgba(5,10,25,.95),rgba(10,20,50,.92)); animation: screenFadeIn .4s ease-out; }
+  @keyframes screenFadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+  @keyframes dashSlideIn { from{opacity:0;transform:translateY(-12px)} to{opacity:1;transform:translateY(0)} }
+  .go-dashboard { animation: dashSlideIn .44s cubic-bezier(.22,1,.36,1) both; }
+  #gameOverScreen { background: linear-gradient(180deg,rgba(4,8,20,0.82) 0%,rgba(4,8,20,0.58) 32%,rgba(4,8,20,0.12) 60%,rgba(4,8,20,0) 100%); justify-content: flex-start; padding-top: 1rem; pointer-events: auto; }
+
+  .game-title { font-size: clamp(2.2rem,8vw,3.2rem); font-weight: 800; color: #fff; letter-spacing: -1px; margin-bottom: .25rem; text-shadow: 0 0 30px rgba(50,180,255,.5); }
+  .game-subtitle { font-size: clamp(.75rem,2.5vw,.9rem); color: #5cc8ff; letter-spacing: 3px; text-transform: uppercase; margin-bottom: 2.5rem; }
+  .instructions { background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); border-radius: 12px; padding: 1rem 1.5rem; margin-bottom: 2rem; max-width: 320px; width: 100%; }
+  .instructions h3 { color:#5cc8ff; font-size:.75rem; letter-spacing:2px; text-transform:uppercase; margin-bottom:.75rem; }
+  .instructions p { color:rgba(255,255,255,.7); font-size:.82rem; line-height:1.7; }
+
+  .btn { background: #5cc8ff; color: #021020; border: none; border-radius: 50px; padding: .85rem 2.5rem; font-size: 1rem; font-weight: 700; cursor: pointer; letter-spacing: .5px; transition: transform .12s cubic-bezier(.34,1.56,.64,1), background .15s, box-shadow .15s; touch-action: manipulation; box-shadow: 0 0 0 rgba(92,200,255,0); }
+  .btn:hover { box-shadow: 0 0 18px rgba(92,200,255,0.4); background: #72d4ff; }
+  .btn:active { transform: scale(.93); background: #3ab0f0; box-shadow: 0 0 6px rgba(92,200,255,0.2); }
+  .btn-secondary { background: transparent; color: rgba(255,255,255,.4); border: 1px solid rgba(255,255,255,.15); font-size: .78rem; padding: .5rem 1.2rem; margin-top: .75rem; }
+  .btn-secondary:active { background: rgba(255,255,255,.05); }
+
+  .go-title { font-size:clamp(1.05rem,4.5vw,1.4rem); font-weight:800; color:#ff5c5c; margin-bottom:.1rem; text-shadow:0 0 16px currentColor; }
+  .go-msg { font-size:.63rem; color:rgba(255,255,255,.58); margin-bottom:.4rem; font-style:italic; max-width:280px; text-shadow:0 1px 3px rgba(0,0,0,.5); }
+  /* Top row: Revenue + Lost */
+  .go-row { display:flex; gap:.3rem; width:100%; max-width:300px; margin-bottom:.25rem; }
+  .go-row .score-card { flex:1; }
+  /* Net Revenue — dominant centre card */
+  .net-card { width:100%; max-width:300px; background:rgba(6,10,24,0.80); border:1px solid rgba(255,215,0,0.30); border-radius:9px; padding:.44rem .8rem; text-align:center; margin-bottom:.28rem; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); box-shadow:0 0 20px rgba(255,215,0,0.05), inset 0 1px 0 rgba(255,215,0,0.06); }
+  .net-card .label { font-size:.5rem; color:rgba(255,215,0,.72); text-transform:uppercase; letter-spacing:2px; margin-bottom:.1rem; font-weight:600; text-shadow:0 1px 3px rgba(0,0,0,.5); }
+  .net-card .value { font-size:1.42rem; font-weight:900; color:#ffd700; line-height:1.05; text-shadow:0 0 16px rgba(255,215,0,.22), 0 1px 4px rgba(0,0,0,.6); }
+  /* Bottom row: Stacked + Height */
+  .go-row-bottom { display:flex; gap:.3rem; width:100%; max-width:300px; margin-bottom:.32rem; }
+  .go-row-bottom .score-card { flex:1; }
+  /* Generic glass card */
+  .score-card { background:rgba(6,10,24,0.74); border:1px solid rgba(92,200,255,0.18); border-radius:7px; padding:.34rem .58rem; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px); box-shadow:inset 0 1px 0 rgba(255,255,255,0.04); }
+  .score-card .label { font-size:.48rem; color:rgba(92,200,255,.72); text-transform:uppercase; letter-spacing:1.5px; margin-bottom:.1rem; font-weight:600; text-shadow:0 1px 3px rgba(0,0,0,.5); }
+  .score-card .value { font-size:.88rem; font-weight:700; color:#edf4ff; text-shadow:0 1px 3px rgba(0,0,0,.4); }
+  .score-card.highlight .value { color:#5cc8ff; }
+
+  #hud { position:absolute; top:0; left:0; right:0; padding:.6rem .8rem; display:flex; justify-content:space-between; align-items:flex-start; z-index:5; pointer-events:none; }
+  .hud-box { background:rgba(0,0,0,.5); border:1px solid rgba(255,255,255,.08); border-radius:8px; padding:.3rem .45rem; text-align:center; }
+  .hud-label { font-size:.48rem; color:rgba(255,255,255,.4); text-transform:uppercase; letter-spacing:1px; }
+  .hud-value { font-size:.9rem; font-weight:700; color:#fff; line-height:1.2; }
+
+  /* Wind indicator hidden — wind is felt, not shown */
+  #windIndicator { display:none; }
+  #collisionIndicator { position:absolute; top:70px; right:.8rem; z-index:5; pointer-events:none; }
+  .wind-bar-container { background:rgba(0,0,0,.5); border:1px solid rgba(255,255,255,.08); border-radius:8px; padding:.35rem .5rem; text-align:center; width:52px; }
+  .wind-label { font-size:.5rem; color:rgba(255,255,255,.4); text-transform:uppercase; letter-spacing:1px; margin-bottom:3px; }
+  .wind-pips { display:flex; gap:2px; justify-content:center; }
+  .wind-pip { width:6px; height:6px; border-radius:50%; background:rgba(255,255,255,.15); transition:background .3s; }
+  .wind-pip.active { background:#5cc8ff; }
+  .wind-pip.strong { background:#ffaa33; }
+  .wind-pip.storm  { background:#ff4444; }
+  .col-pip { width:10px; height:10px; border-radius:50%; background:rgba(255,255,255,.15); transition:background .2s, transform .2s; }
+  .col-pip.hit1 { background:#ffcc00; }
+  .col-pip.hit2 { background:#ff8800; }
+  .col-pip.hit3 { background:#ff2200; transform:scale(1.35); }
+
+  #mobileControls { position:absolute; bottom:0; left:0; right:0; padding:.6rem; z-index:5; display:none; transition:opacity .4s ease; }
+  #mobileControls.faded { opacity:0.18; pointer-events:none; }
+  .ctrl-row { display:flex; justify-content:space-between; align-items:center; gap:.4rem; }
+  .ctrl-dpad { display:grid; grid-template-columns:repeat(3,1fr); grid-template-rows:repeat(3,1fr); gap:3px; width:120px; height:120px; }
+  .ctrl-btn { background:rgba(255,255,255,.08); border:1px solid rgba(255,255,255,.12); border-radius:8px; color:#fff; font-size:1.1rem; cursor:pointer; display:flex; align-items:center; justify-content:center; user-select:none; touch-action:manipulation; transition:background .08s; }
+  .ctrl-btn:active,.ctrl-btn.pressed { background:rgba(92,200,255,.25); border-color:rgba(92,200,255,.4); }
+  .ctrl-btn.up { grid-column:2; grid-row:1; } .ctrl-btn.left { grid-column:1; grid-row:2; }
+  .ctrl-btn.right { grid-column:3; grid-row:2; } .ctrl-btn.down { grid-column:2; grid-row:3; }
+  .ctrl-drop { width:100px; height:100px; border-radius:50%; background:rgba(92,200,255,.12); border:2px solid rgba(92,200,255,.3); font-size:.7rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; color:#5cc8ff; flex-shrink:0; }
+  .ctrl-drop:active { background:rgba(92,200,255,.3); }
+  @media (pointer:coarse) { #mobileControls { display:block; } }
+
+  #comboFlash { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:2rem; font-weight:900; color:#ffd700; text-shadow:0 0 20px rgba(255,215,0,.8); pointer-events:none; z-index:8; opacity:0; transition:opacity .1s; }
+  #warningFlash { position:absolute; top:38%; left:50%; transform:translate(-50%,-50%) scale(1); font-size:1.3rem; font-weight:900; color:#ff6a00; text-shadow:0 0 16px rgba(255,80,0,.9),0 0 4px rgba(0,0,0,1); letter-spacing:2px; text-transform:uppercase; pointer-events:none; z-index:9; opacity:0; transition:opacity .15s,transform .15s; white-space:nowrap; }
+  /* Floating revenue popups */
+  .float-popup { position:absolute; font-size:.95rem; font-weight:800; pointer-events:none; z-index:11; white-space:nowrap; text-shadow:0 0 8px rgba(0,0,0,1); animation:floatUp 1.6s ease-out forwards; }
+  @keyframes floatUp { 0%{opacity:1;transform:translateY(0)} 100%{opacity:0;transform:translateY(-58px)} }
+  /* Perfect stack / combo flash */
+  #streakBadge { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%) scale(0); font-size:1.1rem; font-weight:900; color:#fff; pointer-events:none; z-index:10; opacity:0; transition:opacity .15s, transform .15s; white-space:nowrap; text-align:center; text-shadow:0 0 20px rgba(92,200,255,.9); }
+  #streakBadge.pop { opacity:1; transform:translate(-50%,-50%) scale(1.05); }
+  /* Challenge panel on main menu */
+  .challenge-panel { background:rgba(5,12,30,0.60); border:1px solid rgba(92,200,255,0.15); border-radius:10px; padding:.6rem .85rem; width:100%; max-width:300px; margin-bottom:1rem; backdrop-filter:blur(4px); }
+  .challenge-panel-title { font-size:.46rem; color:rgba(92,200,255,.45); text-transform:uppercase; letter-spacing:2px; margin-bottom:.4rem; text-align:center; }
+  .challenge-item { display:flex; align-items:center; gap:.45rem; margin-bottom:.25rem; }
+  .challenge-item:last-child { margin-bottom:0; }
+  .ch-icon { font-size:.85rem; flex-shrink:0; }
+  .ch-text { font-size:.68rem; color:rgba(255,255,255,.65); flex:1; }
+  .ch-done { font-size:.7rem; color:#5dffa0; flex-shrink:0; }
+  .ch-badge { font-size:.52rem; color:rgba(255,255,255,.28); text-transform:uppercase; flex-shrink:0; }
+  /* Challenge complete popup */
+  #challengeFlash { position:absolute; top:30%; left:50%; transform:translate(-50%,-50%) scale(0); background:rgba(5,12,30,.88); border:1px solid #5dffa0; border-radius:10px; padding:.5rem 1.2rem; font-size:.9rem; font-weight:800; color:#5dffa0; pointer-events:none; z-index:12; opacity:0; transition:opacity .15s, transform .18s; text-align:center; white-space:nowrap; }
+  #challengeFlash.pop { opacity:1; transform:translate(-50%,-50%) scale(1); }
+  /* Recovery modal */
+  #recoveryModal { position:absolute; inset:0; background:rgba(4,8,20,.88); display:flex; align-items:center; justify-content:center; z-index:20; }
+  #recoveryModal.hidden { display:none; }
+  .recovery-box { background:#0d1e45; border:2px solid #ff6a00; border-radius:14px; padding:1.5rem 1.8rem; max-width:280px; width:90%; text-align:center; }
+  .recovery-title { font-size:1.1rem; font-weight:900; color:#ff6a00; margin-bottom:.3rem; letter-spacing:1px; }
+  .recovery-msg { font-size:.78rem; color:rgba(255,255,255,.65); margin-bottom:1rem; line-height:1.5; }
+  .recovery-cost { font-size:1.3rem; font-weight:800; color:#ffd700; margin-bottom:1.2rem; }
+  .recovery-btns { display:flex; gap:.6rem; justify-content:center; flex-wrap:wrap; }
+  .btn-recover { background:#2a9d8f; color:#fff; border:none; border-radius:8px; padding:.6rem 1.1rem; font-size:.82rem; font-weight:700; cursor:pointer; }
+  .btn-recover:active { background:#1f7a6e; }
+  .btn-abandon  { background:transparent; color:rgba(255,255,255,.4); border:1px solid rgba(255,255,255,.2); border-radius:8px; padding:.6rem 1.1rem; font-size:.82rem; cursor:pointer; }
+  .btn-abandon:active { background:rgba(255,255,255,.05); }
+  /* Top Port Runs leaderboard */
+  .top5-section { width:100%; max-width:300px; margin-bottom:.38rem; background:rgba(6,10,22,0.72); border:1px solid rgba(92,200,255,0.14); border-radius:9px; padding:.35rem .62rem; backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px); }
+  .top5-title { font-size:.44rem; color:rgba(92,200,255,.68); text-transform:uppercase; letter-spacing:2px; margin-bottom:.2rem; text-align:center; font-weight:600; text-shadow:0 1px 2px rgba(0,0,0,.4); }
+  /* Column header */
+  .top5-header { display:grid; grid-template-columns:20px 1fr 28px 36px; gap:0 .25rem; padding:.1rem 0 .25rem; border-bottom:1px solid rgba(255,255,255,.07); }
+  .top5-header span { font-size:.44rem; color:rgba(255,255,255,.50); text-transform:uppercase; letter-spacing:1px; font-weight:600; }
+  .top5-header .col-right { text-align:right; }
+  /* Run rows */
+  .top5-list { list-style:none; }
+  .top5-list li { display:grid; grid-template-columns:20px 1fr 28px 36px; gap:0 .25rem; align-items:center; padding:.22rem 0; border-bottom:1px solid rgba(255,255,255,.04); }
+  .top5-list li:last-child { border-bottom:none; }
+  .run-rank  { font-size:.58rem; color:rgba(255,255,255,.52); font-weight:700; text-shadow:0 1px 2px rgba(0,0,0,.4); }
+  .run-net   { font-size:.78rem; font-weight:800; color:#ffd700; font-variant-numeric:tabular-nums; text-shadow:0 0 8px rgba(255,215,0,.18), 0 1px 3px rgba(0,0,0,.5); }
+  .run-stack { font-size:.68rem; color:rgba(255,255,255,.72); text-align:right; font-variant-numeric:tabular-nums; font-weight:600; text-shadow:0 1px 2px rgba(0,0,0,.35); }
+  .run-ht    { font-size:.68rem; color:rgba(255,255,255,.62); text-align:right; font-variant-numeric:tabular-nums; font-weight:600; text-shadow:0 1px 2px rgba(0,0,0,.35); }
+  .top5-list li.rank1 .run-net { color:#ffd700; font-size:.82rem; }
+  .top5-list li.rank2 .run-net { color:#c8d4e8; }
+  .top5-list li.rank3 .run-net { color:#cd7f32; }
+  /* Failure type title colours */
+  .go-title.physics  { color:#ff5c5c; }
+  .go-title.financial { color:#ffaa33; }
+  /* Height HUD badge */
+  #heightBadge { position:absolute; top:70px; left:.8rem; z-index:5; pointer-events:none; }
+  #muteBtn { position:absolute; top:.55rem; right:4rem; z-index:6; background:rgba(0,0,0,.45); border:1px solid rgba(255,255,255,.12); border-radius:8px; color:rgba(255,255,255,.7); font-size:.85rem; width:30px; height:30px; cursor:pointer; display:flex; align-items:center; justify-content:center; transition:background .1s; touch-action:manipulation; padding:0; }
+  #muteBtn:active { background:rgba(92,200,255,.2); }
+</style>
+</head>
+<body>
+<div id="gameWrapper">
+  <canvas id="gameCanvas"></canvas>
+
+  <div id="hud">
+    <div class="hud-box"><div class="hud-label">Port Revenue</div><div class="hud-value" id="hudScore">$0</div></div>
+    <div class="hud-box"><div class="hud-label">Lost</div><div class="hud-value" id="hudLost" style="color:#ff7755">$0</div></div>
+    <div class="hud-box"><div class="hud-label">Height</div><div class="hud-value" id="hudHeight">0m</div></div>
+  </div>
+
+  <div id="windIndicator">
+    <div class="wind-bar-container">
+      <div class="wind-label">Wind</div>
+      <div class="wind-pips" id="windPips">
+        <div class="wind-pip" id="wp0"></div><div class="wind-pip" id="wp1"></div>
+        <div class="wind-pip" id="wp2"></div><div class="wind-pip" id="wp3"></div>
+        <div class="wind-pip" id="wp4"></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="collisionIndicator">
+    <div class="wind-bar-container" style="width:56px">
+      <div class="wind-label">Hits</div>
+      <div class="wind-pips" id="collisionPips">
+        <div class="col-pip" id="cp0"></div>
+        <div class="col-pip" id="cp1"></div>
+        <div class="col-pip" id="cp2"></div>
+      </div>
+    </div>
+  </div>
+
+  <button id="muteBtn" title="Toggle sound">&#128266;</button>
+  <div id="comboFlash"></div>
+  <div id="warningFlash"></div>
+  <div id="streakBadge"></div>
+  <div id="challengeFlash"></div>
+
+  <div id="mobileControls">
+    <div class="ctrl-row">
+      <div class="ctrl-dpad">
+        <div class="ctrl-btn up" id="btnUp">&#9650;</div>
+        <div class="ctrl-btn left" id="btnLeft">&#9664;</div>
+        <div class="ctrl-btn right" id="btnRight">&#9654;</div>
+        <div class="ctrl-btn down" id="btnDown">&#9660;</div>
+      </div>
+      <div class="ctrl-btn ctrl-drop" id="btnDrop">DROP</div>
+    </div>
+  </div>
+
+  <!-- Main Menu -->
+  <div class="screen" id="startScreen">
+    <div class="game-title">Container<br>Stacker</div>
+    <div class="game-subtitle">Port Crane Arcade</div>
+    <div class="challenge-panel" id="challengePanel">
+      <div class="challenge-panel-title">Today's Challenges</div>
+      <div id="challengeList"></div>
+    </div>
+    <button class="btn" id="startBtn" style="margin-bottom:.6rem">PLAY</button>
+    <button class="btn btn-secondary" id="howToBtn" style="margin-bottom:.5rem">HOW TO PLAY</button>
+    <button class="btn btn-secondary" id="resetBestBtn">Reset Revenue Records</button>
+  </div>
+
+  <!-- How To Play screen -->
+  <div class="screen hidden" id="howToScreen">
+    <div class="htp-title">How To Play</div>
+    <div class="htp-sub">Port Crane Operations</div>
+
+    <ul class="htp-rules">
+      <li>
+        <span class="htp-icon">🏗</span>
+        <span class="htp-text">Move the crane and <strong>lower containers</strong> into the <strong>Loading Zone</strong></span>
+      </li>
+      <li>
+        <span class="htp-icon">📦</span>
+        <span class="htp-text">Stack containers side-by-side to fill the zone, then <strong>build upward</strong></span>
+      </li>
+      <li>
+        <span class="htp-icon">⚖️</span>
+        <span class="htp-text">Different sizes and <strong>uneven weight distribution</strong> affect balance</span>
+      </li>
+      <li>
+        <span class="htp-icon">💨</span>
+        <span class="htp-text"><strong>Wind conditions escalate</strong> over time — containers swing harder</span>
+      </li>
+      <li>
+        <span class="htp-icon">⚠️</span>
+        <span class="htp-text"><strong>3 collision impacts</strong> causes container structural failure</span>
+      </li>
+      <li>
+        <span class="htp-icon">💰</span>
+        <span class="htp-text">Maximise <strong>Net Revenue</strong> — careful placements earn more, damage costs more</span>
+      </li>
+    </ul>
+
+    <div class="htp-controls">
+      <div class="htp-controls-title">Controls</div>
+      <div class="htp-ctrl-row">
+        <div class="htp-ctrl"><span class="htp-ctrl-key">◀ ▶</span><span class="htp-ctrl-lbl">Move</span></div>
+        <div class="htp-ctrl"><span class="htp-ctrl-key">▲ ▼</span><span class="htp-ctrl-lbl">Raise / Lower</span></div>
+        <div class="htp-ctrl"><span class="htp-ctrl-key">SPACE</span><span class="htp-ctrl-lbl">Drop</span></div>
+      </div>
+    </div>
+
+    <button class="btn" id="htpStartBtn">START OPERATIONS</button>
+    <button class="btn btn-secondary" id="htpBackBtn" style="margin-top:.5rem">← Back</button>
+  </div>
+
+  <div class="screen hidden" id="gameOverScreen">
+    <div id="goDashboard" style="display:flex;flex-direction:column;align-items:center;width:100%">
+    <div class="go-title physics" id="goTitle">STACK FAILURE</div>
+    <div class="go-msg" id="goMsg">"The tower finally gave up."</div>
+
+    <!-- Row 1: Revenue + Lost -->
+    <div class="go-row">
+      <div class="score-card"><div class="label">Port Revenue</div><div class="value" id="goScore" style="color:#5dffa0">$0</div></div>
+      <div class="score-card"><div class="label">Lost Revenue</div><div class="value" id="goLost" style="color:#ff7755">$0</div></div>
+    </div>
+
+    <!-- Net Revenue — dominant -->
+    <div class="net-card">
+      <div class="label">Net Revenue</div>
+      <div class="value" id="goNet">$0</div>
+    </div>
+
+    <!-- Row 2: Stacked + Height -->
+    <div class="go-row-bottom">
+      <div class="score-card"><div class="label">Stacked</div><div class="value" id="goStacked">0</div></div>
+      <div class="score-card"><div class="label">Height</div><div class="value" id="goHeight">0m</div></div>
+    </div>
+
+    <!-- Top Port Runs -->
+    <div class="top5-section">
+      <div class="top5-title">Top Port Runs</div>
+      <ul class="top5-list" id="top5List"></ul>
+    </div>
+
+    <div style="display:flex;gap:.6rem;flex-wrap:wrap;justify-content:center;">
+      <button class="btn" id="playAgainBtn" style="padding:.7rem 1.8rem;font-size:.9rem;">PLAY AGAIN</button>
+      <button class="btn btn-secondary" id="resetBestBtn2" style="margin-top:0;">Reset Scores</button>
+    </div>
+    </div><!-- end goDashboard -->
+  </div>
+
+  <!-- Recovery Modal -->
+  <div id="recoveryModal" class="hidden">
+    <div class="recovery-box">
+      <div class="recovery-title">CONTAINER FAILURE</div>
+      <div class="recovery-msg">Replace container and continue operations?</div>
+      <div class="recovery-cost" id="recoveryCost">Recovery Cost: $750</div>
+      <div class="recovery-btns">
+        <button class="btn-recover" id="btnRecover">REPLACE &amp; CONTINUE</button>
+        <button class="btn-abandon" id="btnAbandon">ABANDON PORT</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============================================================
+//  CONTAINER STACKER
+// ============================================================
+
+const canvas  = document.getElementById('gameCanvas');
+const ctx     = canvas.getContext('2d');
+const wrapper = document.getElementById('gameWrapper');
+
+// ---- Constants ----
+const CONTAINER_SIZES = [
+  { label: '10ft', widthRatio: 0.14 },
+  { label: '20ft', widthRatio: 0.22 },
+  { label: '40ft', widthRatio: 0.38 },
+];
+const CONTAINER_H    = 34;
+const CRANE_Y_RATIO  = 0.52;
+const GROUND_Y_RATIO = 0.88;
+const MOVE_SPEED  = 3.5;
+const LOWER_SPEED = 2.2;
+const RAISE_SPEED = 2.2;
+const ZONE_L = 0.20;
+const ZONE_R = 0.80;
+const MAX_OVERHANG = 0.40;
+
+// Collision and placement sensitivity constants
+const GENTLE_CONTACT_BUFFER  = 12;   // px — nudging tolerance for gentle side contact
+const PLACEMENT_TOLERANCE    = 14;   // px — support/overhang forgiveness
+const DAMAGE_IMPACT_THRESHOLD = 0.18; // legacy — kept but not used in new logic
+const MAX_SAFE_SWING_ANGLE   = 0.065; // radians — kept for reference
+const MAX_SAFE_SWING_VELOCITY = 0.035; // kept for reference
+// Mobile-safe damage thresholds (used in resolveCollisions)
+const MOBILE_DAMAGE_SWING_ANGLE    = 0.035; // any swing above this = impact
+const MOBILE_DAMAGE_SWING_VELOCITY = 0.018; // any swingV above this = impact
+const SAFE_CONTACT_BUFFER          = 8;     // px — overlap below this is a graze
+const DAMAGE_OVERLAP_THRESHOLD     = 10;    // px — overlap above this always damages
+
+const CONTAINER_COLORS = ['#e63946','#457b9d','#2a9d8f','#e9c46a','#f4a261','#a8dadc','#6a4c93','#52b788','#fb8b24','#d62828'];
+const COLLAPSE_MSGS = ['"I can save this... oh no."','"One more and I\'d have set a record."','"The physics were against me."','"Wind did it. Definitely the wind."','"Totally on purpose."','"Outside the zone! Rookie mistake."','"3 collisions. Oops."'];
+
+// Container revenue values
+const CONTAINER_VALUES = { 0: 500, 1: 1500, 2: 2500 }; // by size index
+// Wind revenue multipliers
+const WIND_MULT = [1.0, 1.15, 1.35, 1.6, 2.0];
+
+// ---- Top 5 runs (stored as objects, sorted by net revenue) ----
+function loadTop5() {
+  try {
+    const raw = JSON.parse(localStorage.getItem('csTop5Runs') || '[]');
+    // Migrate old format (plain numbers) to objects
+    return raw.map(r => typeof r === 'number' ? { revenue: r, lost: 0, net: r, height: 0 } : r);
+  } catch(e) { return []; }
+}
+function saveTop5(runs) {
+  localStorage.setItem('csTop5Runs', JSON.stringify(runs));
+}
+function addToTop5(revenue, lost, height, stacked) {
+  const net = Math.max(0, revenue - lost);
+  const run = { revenue, lost, net, height, stacked: stacked || 0 };
+  const runs = loadTop5();
+  runs.push(run);
+  runs.sort((a,b) => b.net - a.net); // sort by NET revenue
+  const top5 = runs.slice(0, 5);
+  saveTop5(top5);
+  return top5;
+}
+
+// ---- Game state ----
+const game = {
+  running: false, paused: false, score: 0, stacked: 0,
+  bestScore: parseInt(localStorage.getItem('csbestScore') || '0'),
+  windLevel: 1, windAngle: 0,
+  collisions: 0,
+  lostRevenue: 0,
+  failureType: 'physics',
+  streak: 0,          // consecutive clean placements
+  perfectCount: 0,    // perfect placements this run
+};
+
+// ── Daily / session challenges ──
+const CHALLENGE_DEFS = [
+  { id:'height25',  icon:'📏', text:'Reach 25m height',          check: g => g.height >= 25 },
+  { id:'height50',  icon:'🏗',  text:'Reach 50m height',          check: g => g.height >= 50 },
+  { id:'stack10',   icon:'📦', text:'Stack 10 containers',        check: g => g.stacked >= 10 },
+  { id:'stack20',   icon:'📦', text:'Stack 20 containers',        check: g => g.stacked >= 20 },
+  { id:'net15k',    icon:'💰', text:'Earn $15k Net Revenue',      check: g => (g.score - g.lostRevenue) >= 15000 },
+  { id:'net30k',    icon:'💰', text:'Earn $30k Net Revenue',      check: g => (g.score - g.lostRevenue) >= 30000 },
+  { id:'losslt1k',  icon:'🎯', text:'Finish with under $1k lost', check: g => g.lostRevenue < 1000 && g.stacked >= 5 },
+  { id:'perfect5',  icon:'⭐', text:'5 perfect placements',       check: g => g.perfectCount >= 5 },
+  { id:'nodamage',  icon:'🛡',  text:'Place 8 containers, no hits',check: g => g.stacked >= 8 && g.collisions === 0 },
+  { id:'streak6',   icon:'🔥', text:'6-container clean streak',   check: g => g.streak >= 6 },
+];
+
+// Pick 3 challenges seeded by day (consistent within a day, changes daily)
+function getActiveChallenges() {
+  const dayKey = Math.floor(Date.now() / 86400000);
+  const saved  = JSON.parse(localStorage.getItem('csChallenges') || '{}');
+  if (saved.dayKey === dayKey && saved.ids) {
+    return saved.ids.map(id => CHALLENGE_DEFS.find(c => c.id === id)).filter(Boolean);
+  }
+  // Pick 3 pseudo-randomly from day seed
+  const rng = (n) => { let x = Math.sin(dayKey * 9301 + n * 49297) * 233280; return Math.abs(x) % 1; };
+  const pool = [...CHALLENGE_DEFS].sort((a,b) => rng(a.id.charCodeAt(0)) - rng(b.id.charCodeAt(0)));
+  const chosen = pool.slice(0, 3);
+  localStorage.setItem('csChallenges', JSON.stringify({ dayKey, ids: chosen.map(c=>c.id) }));
+  return chosen;
+}
+
+const activeChallenges = getActiveChallenges();
+const completedChallenges = new Set(JSON.parse(localStorage.getItem('csCompletedChallenges') || '[]'));
+
+function checkChallenges() {
+  const g = { score: game.score, stacked: game.stacked, lostRevenue: game.lostRevenue,
+              collisions: game.collisions, perfectCount: game.perfectCount,
+              streak: game.streak, height: getStackHeightMetres() };
+  for (const ch of activeChallenges) {
+    if (!completedChallenges.has(ch.id) && ch.check(g)) {
+      completedChallenges.add(ch.id);
+      const arr = [...completedChallenges];
+      localStorage.setItem('csCompletedChallenges', JSON.stringify(arr));
+      // Bonus revenue
+      const bonus = 2000;
+      game.score += bonus;
+      spawnFloatText(canvas.width/2, canvas.height * 0.45, '+' + fmtMoney(bonus) + ' CHALLENGE!', '#5dffa0');
+      showChallengeFlash(ch.icon + ' ' + ch.text);
+      SFX.bonus();
+      renderChallengePanel(); // update checkmarks
+    }
+  }
+}
+
+function renderChallengePanel() {
+  const el = document.getElementById('challengeList');
+  if (!el) return;
+  el.innerHTML = activeChallenges.map(ch => {
+    const done = completedChallenges.has(ch.id);
+    return `<div class="challenge-item">
+      <span class="ch-icon">${ch.icon}</span>
+      <span class="ch-text" style="${done?'text-decoration:line-through;opacity:.4':''}"> ${ch.text}</span>
+      <span class="${done?'ch-done':'ch-badge'}">${done?'✓':''}</span>
+    </div>`;
+  }).join('');
+}
+
+// Camera pan + shake state
+const cam = { offsetY: 0, targetOffsetY: 0, zoom: 1.0, targetZoom: 1.0, shakeX: 0, shakeY: 0, shakeDecay: 0 };
+function addShake(amount) { cam.shakeX=(Math.random()-0.5)*amount*2; cam.shakeY=(Math.random()-0.5)*amount*2; cam.shakeDecay=Math.max(cam.shakeDecay, amount); }
+
+let recoveryPendingIdx = -1;
+let rainParticles = [];
+let lightningAlpha = 0;
+
+let stack = [];
+let active = null;
+let crane = { x: 0, y: 0, armRight: 0 };
+let particles = [];
+let bgStars = [], bgBoats = [], bgLights = [];
+const keys = { left:false, right:false, up:false, down:false };
+let dropTriggered = false;
+let lastTime = 0, comboTimeout = null, warningTimeout = null;
+
+// ============================================================
+//  SOUND ENGINE (Web Audio API — no external files)
+// ============================================================
+const SFX = (() => {
+  let _ctx = null;
+  let _muted = localStorage.getItem('csMuted') === '1';
+  const _last = {};
+
+  function ac() {
+    if (!_ctx) {
+      try { _ctx = new (window.AudioContext || window.webkitAudioContext)(); } catch(e) { return null; }
+    }
+    if (_ctx.state === 'suspended') _ctx.resume();
+    return _ctx;
+  }
+
+  function throttle(k, ms) {
+    const now = Date.now();
+    if (now - (_last[k]||0) < ms) return false;
+    _last[k] = now; return true;
+  }
+
+  function tone(freq, type, dur, vol, attack, freqEnd) {
+    if (_muted) return;
+    const c = ac(); if (!c) return;
+    const now = c.currentTime;
+    const g = c.createGain();
+    g.gain.setValueAtTime(0, now);
+    g.gain.linearRampToValueAtTime(Math.min(vol, 0.25), now + (attack||0.005));
+    g.gain.exponentialRampToValueAtTime(0.0001, now + dur);
+    const o = c.createOscillator();
+    o.type = type || 'sine';
+    o.frequency.setValueAtTime(freq, now);
+    if (freqEnd) o.frequency.exponentialRampToValueAtTime(freqEnd, now + dur);
+    o.connect(g); g.connect(c.destination);
+    o.start(now); o.stop(now + dur + 0.05);
+  }
+
+  function noise(dur, vol, hp) {
+    if (_muted) return;
+    const c = ac(); if (!c) return;
+    const n = Math.ceil(c.sampleRate * dur);
+    const buf = c.createBuffer(1, n, c.sampleRate);
+    const d = buf.getChannelData(0);
+    for (let i=0;i<n;i++) d[i] = Math.random()*2-1;
+    const src = c.createBufferSource(); src.buffer = buf;
+    const g = c.createGain();
+    g.gain.setValueAtTime(Math.min(vol, 0.2), c.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + dur);
+    if (hp) { const f=c.createBiquadFilter(); f.type='highpass'; f.frequency.value=hp; src.connect(f); f.connect(g); }
+    else src.connect(g);
+    g.connect(c.destination); src.start(); src.stop(c.currentTime + dur);
+  }
+
+  return {
+    isMuted: () => _muted,
+    toggle() { _muted = !_muted; localStorage.setItem('csMuted', _muted?'1':'0'); return _muted; },
+    land(instability) {
+      if (!throttle('land', 90)) return;
+      tone(110 - instability*35, 'sine', 0.18, 0.10 + instability*0.06, 0.003, 50);
+      noise(0.07, 0.035 + instability*0.03, 200);
+    },
+    damage(level) {
+      if (!throttle('dmg', 220)) return;
+      noise(0.10 + level*0.04, 0.05 + level*0.015, 500 + level*350);
+      tone(160 - level*25, 'sawtooth', 0.07, 0.035, 0.002, 75);
+    },
+    creak() {
+      if (!throttle('creak', 500)) return;
+      tone(200 + Math.random()*50, 'sawtooth', 0.22, 0.032, 0.01, 165);
+    },
+    collapse() {
+      noise(0.55, 0.10, 80);
+      tone(75, 'sawtooth', 0.35, 0.07, 0.01, 28);
+      setTimeout(() => noise(0.35, 0.07, 280), 130);
+    },
+    revenue() {
+      if (!throttle('rev', 160)) return;
+      tone(840, 'sine', 0.07, 0.055, 0.003, 1050);
+    },
+    bonus() {
+      tone(620, 'sine', 0.055, 0.065, 0.002, 840);
+      setTimeout(() => tone(1040,'sine',0.055,0.055,0.002,1260), 65);
+    },
+    click() {
+      if (!throttle('click', 60)) return;
+      tone(550, 'sine', 0.045, 0.035, 0.001, 480);
+    },
+    move() {
+      if (!throttle('move', 130)) return;
+      tone(280, 'sine', 0.035, 0.012, 0.002);
+    },
+    horn() {
+      // Distant ship horn — very low, brief
+      tone(85, 'sine', 0.8, 0.025, 0.05, 78);
+      tone(110, 'sine', 0.6, 0.015, 0.08, 100);
+    },
+    perfect() {
+      tone(880, 'sine', 0.06, 0.07, 0.002, 1320);
+      setTimeout(() => tone(1100,'sine',0.05,0.06,0.002,1760), 55);
+      setTimeout(() => tone(1320,'sine',0.05,0.05,0.002,2200), 110);
+    },
+  };
+})();
+
+// Occasional ambient harbour horn (every 30–90 seconds)
+(function scheduleHorn() {
+  const delay = 30000 + Math.random() * 60000;
+  setTimeout(() => { if (!SFX.isMuted()) SFX.horn(); scheduleHorn(); }, delay);
+})();
+// cooldown map: stack index -> last hit timestamp
+let lastHitCooldown = {};
+
+// ============================================================
+//  BACKGROUND
+// ============================================================
+function initBackground() {
+  bgStars = Array.from({length:60}, () => ({ x:Math.random(), y:Math.random()*0.45, r:Math.random()*1.2+0.3, alpha:Math.random()*0.6+0.3, twinkle:Math.random()*Math.PI*2 }));
+  bgBoats = Array.from({length:2},  () => ({ x:Math.random()*0.6+0.05, speed:(Math.random()*0.00004+0.00002)*(Math.random()<0.5?1:-1), size:Math.random()*0.6+0.7 }));
+  bgLights= Array.from({length:6},  () => ({ x:Math.random()*0.9+0.05, y:Math.random()*0.12+0.66, color:['#ffcc44','#ff8844','#44ccff','#ff4444'][Math.floor(Math.random()*4)], phase:Math.random()*Math.PI*2 }));
+}
+
+// ============================================================
+//  START / SPAWN
+// ============================================================
+function startGame() {
+  Object.assign(game, { running:true, paused:false, score:0, stacked:0, windLevel:1, windAngle:0, collisions:0, lostRevenue:0, failureType:'physics', streak:0, perfectCount:0 });
+  cam.offsetY=0; cam.targetOffsetY=0; cam.zoom=1.0; cam.targetZoom=1.0; cam.shakeX=0; cam.shakeY=0; cam.shakeDecay=0;
+  stack=[]; particles=[]; dropTriggered=false; lastHitCooldown={}; recoveryPendingIdx=-1; rainParticles=[]; lightningAlpha=0; document.getElementById('recoveryModal').classList.add('hidden');
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('howToScreen').classList.add('hidden');
+  document.getElementById('gameOverScreen').classList.add('hidden');
+  // Restore mobile controls opacity
+  const mc = document.getElementById('mobileControls');
+  if (mc) mc.classList.remove('faded');
+  initBackground(); updateHUD(); spawnContainer();
+  requestAnimationFrame(loop);
+}
+
+function spawnContainer() {
+  const W = canvas.width, H = canvas.height;
+  const sizeIdx = Math.floor(Math.random() * 3);
+  const sz    = CONTAINER_SIZES[sizeIdx];
+  const cw    = Math.round(W * sz.widthRatio);
+  const color = CONTAINER_COLORS[Math.floor(Math.random() * CONTAINER_COLORS.length)];
+  const bias  = (Math.random() - 0.5) * 0.2;
+  const craneX  = W * 0.72;
+  const craneY  = H * CRANE_Y_RATIO;
+  const groundY = H * GROUND_Y_RATIO;
+  // Highest stacked container top in world coords
+  const highestY = stack.length > 0 ? Math.min(...stack.map(c => c.y)) : groundY;
+  // Spawn at least 100px above stack top, clamped to min cable length
+  const CLEARANCE = 100;
+  const minCable  = CONTAINER_H + 20;
+  const desiredContainerTop = Math.min(highestY - CLEARANCE, craneY + minCable);
+  // cableLen so container top = craneY + cableLen - CONTAINER_H  (swingAngle=0, cos=1)
+  const cableLen = Math.max(minCable, desiredContainerTop + CONTAINER_H - craneY);
+  const spawnY   = craneY + cableLen - CONTAINER_H;
+  active = {
+    x: craneX - cw / 2, y: spawnY,
+    w: cw, h: CONTAINER_H, color, bias,
+    sizeIdx, value: CONTAINER_VALUES[sizeIdx],
+    cableX: craneX, cableLen,
+    velX: 0, velY: 0, swingAngle: 0, swingV: 0,
+    state: 'hanging',
+  };
+  active.spawnGraceUntil = Date.now() + 500;
+  crane.x = craneX; crane.y = craneY; crane.armRight = W * 0.88;
+}
+
+// ============================================================
+//  LOOP
+// ============================================================
+function loop(ts) {
+  if (!game.running) return;
+  if (game.paused) {
+    // Keep rendering the scene while paused (modal visible) but don't update physics
+    renderFrame();
+    requestAnimationFrame(loop);
+    return;
+  }
+  const dt = Math.min((ts-lastTime)/16.67, 3);
+  lastTime = ts;
+  update(dt); renderFrame();
+  requestAnimationFrame(loop);
+}
+
+function update(dt) {
+  game.windAngle += dt*0.018*(1+(game.windLevel-1)*0.25);
+  updateBackground(dt); updateParticles(dt);
+  if (stack.length) updateStack(dt);
+  updateCamera(dt);
+  if (!active) return;
+  if (active.state==='hanging') {
+    updateHanging(dt);
+    if (dropTriggered) { dropTriggered=false; commitPlacement(); }
+  }
+}
+
+function updateCamera(dt) {
+  const H = canvas.height;
+  const groundY = H * GROUND_Y_RATIO;
+  const stackPx = stack.length > 0 ? groundY - Math.min(...stack.map(c=>c.y)) : 0;
+  const panThreshold = H * 0.18;
+  const maxPan       = H * 0.42;
+  cam.targetOffsetY = stackPx > panThreshold
+    ? Math.min(maxPan, (stackPx - panThreshold) * 0.48)
+    : 0;
+  // Subtle zoom-out — max 10% at very tall stacks
+  cam.targetZoom = Math.max(0.90, 1.0 - (stackPx / (H * 2.8)));
+  // Wind-5 camera micro-sway
+  if (game.windLevel >= 5) {
+    cam.targetOffsetY += Math.sin(game.windAngle * 0.6) * 2.5;
+  }
+  // Exponential easing: fast catch-up, slow settle
+  const ease = 1 - Math.pow(0.97, dt);
+  cam.offsetY += (cam.targetOffsetY - cam.offsetY) * ease;
+  cam.zoom    += (cam.targetZoom    - cam.zoom)    * ease;
+  // Shake decay
+  if (cam.shakeDecay > 0.1) {
+    cam.shakeX = (Math.random()-0.5) * cam.shakeDecay * 1.8;
+    cam.shakeY = (Math.random()-0.5) * cam.shakeDecay * 1.2;
+    cam.shakeDecay *= Math.pow(0.82, dt);
+  } else {
+    cam.shakeX = 0; cam.shakeY = 0; cam.shakeDecay = 0;
+  }
+}
+
+function getStackHeightMetres() {
+  if (!stack.length) return 0;
+  const H = canvas.height;
+  const groundY = H * GROUND_Y_RATIO;
+  const topY = Math.min(...stack.map(c=>c.y));
+  const stackPx = groundY - topY;
+  // Each container = 34px ≈ 2.6m; scale proportionally
+  return Math.round((stackPx / 34) * 2.6);
+}
+
+function updateBackground(dt) {
+  const wl = game.windLevel;
+  // Light speed scales with wind
+  const lightSpeed = 0.06 + (wl-1)*0.02;
+  for (const b of bgBoats) { b.x+=b.speed*dt*(0.8+wl*0.1); if(b.x>1.1)b.x=-0.1; if(b.x<-0.1)b.x=1.1; }
+  for (const s of bgStars)  s.twinkle+=dt*0.04;
+  for (const l of bgLights) l.phase+=dt*lightSpeed;
+
+  // Rain particles at wind 4+
+  if (wl >= 4) {
+    const count = wl === 5 ? 4 : 2;
+    for (let i=0; i<count; i++) {
+      rainParticles.push({
+        x: Math.random(), y: 0,
+        vy: 0.012 + Math.random()*0.008,
+        vx: 0.002*(wl-3),
+        life: 1, len: 0.04+Math.random()*0.04
+      });
+    }
+    for (let i=rainParticles.length-1; i>=0; i--) {
+      const r=rainParticles[i];
+      r.x+=r.vx*dt; r.y+=r.vy*dt; r.life-=0.025*dt;
+      if (r.y>1.1||r.life<=0) rainParticles.splice(i,1);
+    }
+  }
+
+  // Lightning at wind 4+
+  if (wl >= 4 && Math.random() < 0.0008*dt*(wl-3)) lightningAlpha = 0.18 + Math.random()*0.12;
+  if (lightningAlpha > 0) lightningAlpha = Math.max(0, lightningAlpha - 0.04*dt);
+}
+
+// ============================================================
+//  HANGING + COLLISION
+// ============================================================
+function updateHanging(dt) {
+  const W = canvas.width;
+  const wi = (game.windLevel-1)/4;
+  const windForce  = Math.sin(game.windAngle)*(0.00008+wi*0.0016);
+  const dampFactor = 0.978+wi*0.015;
+  active.swingV += (-0.006*Math.sin(active.swingAngle)+windForce)*dt;
+  active.swingV *= Math.pow(dampFactor, dt);
+  active.swingAngle += active.swingV*dt;
+  const maxSwing = 0.07+wi*0.52;
+  active.swingAngle = Math.max(-maxSwing, Math.min(maxSwing, active.swingAngle));
+
+  if (keys.left)  { active.cableX -= MOVE_SPEED * dt; active.swingV -= 0.0007 * dt; SFX.move(); }
+  if (keys.right) { active.cableX += MOVE_SPEED * dt; active.swingV += 0.0007 * dt; SFX.move(); }
+  active.cableX = Math.max(active.w*0.55, Math.min(W-active.w*0.55, active.cableX));
+  crane.x = active.cableX;
+
+  const minCable = active.h + 20;
+  // maxCable: enough to reach the surface beneath the container.
+  // Compute it fresh each frame from current surface height so lowering
+  // works regardless of stack height — but NEVER lock cableLen to it.
+  const surfaceYForMax = surfaceUnder(
+    active.cableX - active.w / 2,
+    active.cableX + active.w / 2
+  );
+  const cosAForMax = Math.cos(active.swingAngle) || 0.001;
+  const maxCable = Math.max(minCable + 10,
+    (surfaceYForMax - active.h - crane.y) / cosAForMax + active.h
+  );
+
+  // Player hoist control — clamped to min/max, never overridden elsewhere
+  if (keys.up)   active.cableLen -= RAISE_SPEED * dt;
+  if (keys.down) active.cableLen += LOWER_SPEED * dt;
+  active.cableLen = Math.max(minCable, Math.min(maxCable, active.cableLen));
+
+  // Position from pendulum
+  active.x = active.cableX + Math.sin(active.swingAngle) * active.cableLen - active.w / 2;
+  active.y = crane.y        + Math.cos(active.swingAngle) * active.cableLen - active.h;
+
+  // Visual floor clamp: stop container passing through surfaces.
+  // IMPORTANT: do NOT touch cableLen here — that would override player input.
+  const surfaceY = surfaceUnder(active.x, active.x + active.w);
+  const floorY   = surfaceY - active.h;
+  if (active.y > floorY) {
+    active.y = floorY;
+    // Only shorten cable if player is actively trying to go lower
+    // (i.e. they're pressing down into the surface). Otherwise leave it.
+    if (keys.down) {
+      const cosA = Math.cos(active.swingAngle) || 0.001;
+      active.cableLen = Math.max(minCable, (active.y + active.h - crane.y) / cosA);
+    }
+  }
+
+  // Side collision resolution + damage
+  resolveCollisions();
+}
+
+function resolveCollisions() {
+  if (!game.running || game.paused || !active || active.state !== 'hanging') return;
+  if (Date.now() < (active.spawnGraceUntil || 0)) return; // spawn grace period
+  const now = Date.now();
+  const HIT_COOLDOWN_MS = 1200;
+
+  // Use raw active bounds (no touch buffer) for overlap measurement
+  const aL = active.x;
+  const aR = active.x + active.w;
+  const aT = active.y;
+  const aB = active.y + active.h;
+
+  for (let i = 0; i < stack.length; i++) {
+    const c  = stack[i];
+    const cL = c.x - c.w / 2;
+    const cR = c.x + c.w / 2;
+    const cT = c.y;
+    const cB = c.y + c.h;
+
+    // Use a small proximity buffer for initial contact detection,
+    // but measure actual overlap depth separately for damage decision
+    const probeL = aL - GENTLE_CONTACT_BUFFER;
+    const probeR = aR + GENTLE_CONTACT_BUFFER;
+    const hProbe       = Math.min(probeR, cR) - Math.max(probeL, cL);
+    const vOverlap     = Math.min(aB, cB)     - Math.max(aT, cT);
+    const overlapDepth = Math.min(aR, cR)     - Math.max(aL, cL); // raw overlap, no buffer
+
+    // No proximity contact at all — skip
+    if (hProbe <= 0 || vOverlap <= 0) continue;
+
+    // Skip if active is landing on top (floor clamp handles this)
+    const activeBottomNearTop = aB >= cT - 4 && aB <= cT + 8 && active.y < cT;
+    const mostlyAbove         = active.y + active.h * 0.65 < cT;
+    if (activeBottomNearTop && mostlyAbove) continue;
+
+    // Must be a side-band contact (centres within ~one container height)
+    const activeCentreY    = aT + active.h / 2;
+    const containerCentreY = cT + c.h  / 2;
+    if (Math.abs(activeCentreY - containerCentreY) >= active.h * 0.9) continue;
+
+    // ── Impact classification (works on both desktop and mobile) ──
+    // A contact is a SWINGING IMPACT if the container has meaningful angle or velocity.
+    // A contact is a DEEP OVERLAP if it has pushed well past the tolerance buffer.
+    // Neither requires checking keyboard/button state — safe for mobile.
+    const isSwingingImpact =
+      Math.abs(active.swingAngle) > MOBILE_DAMAGE_SWING_ANGLE ||
+      Math.abs(active.swingV)     > MOBILE_DAMAGE_SWING_VELOCITY;
+
+    const isDeepOverlap = overlapDepth > DAMAGE_OVERLAP_THRESHOLD;
+
+    // A contact is GENTLE only if there is no swing and the overlap is shallow.
+    // Explicitly does NOT check keys.down — that broke mobile.
+    const isGentleContact =
+      !isSwingingImpact &&
+      !isDeepOverlap &&
+      overlapDepth <= SAFE_CONTACT_BUFFER;
+
+    if (isGentleContact) continue;
+
+    // Must be a meaningful impact to reach here
+    if (!isSwingingImpact && !isDeepOverlap) continue;
+
+    // ── Cooldown ──
+    const lastHit = lastHitCooldown[i] || 0;
+    if (now - lastHit < HIT_COOLDOWN_MS) continue;
+    lastHitCooldown[i] = now;
+
+    // ── Apply damage ──
+    const prevDamage = c.damage || 0;
+    c.damage = Math.min(3, prevDamage + 1);
+    c.instability = Math.min(0.95, (c.instability || 0) + 0.18);
+    c.settled = false;
+    const activeCentreX = active.x + active.w / 2;
+    const dir = activeCentreX < c.x ? -1 : 1;
+    c.wobbleV += dir * 0.075;
+    active.swingV   *= -0.12;
+    active.swingAngle *= 0.55;
+    addShake(3.5 + c.damage * 1.5);
+    SFX.damage(c.damage);
+    game.streak = 0; // collision resets clean streak
+    game.collisions++;
+
+    // Revenue deduction
+    const baseVal = c.value || 1500;
+    let deduct = 0;
+    if      (c.damage === 1) deduct = Math.round(baseVal * 0.25);
+    else if (c.damage === 2) deduct = Math.round(baseVal * 0.40); // additional to reach 65%
+    else if (c.damage === 3) deduct = Math.round(baseVal * 0.35); // remaining
+    game.score = Math.max(0, game.score - deduct);
+    game.lostRevenue += deduct;
+    if (deduct > 0) spawnFloatText(c.x, c.y, '-' + fmtMoney(deduct) + ' DAMAGE', '#ff5555');
+
+    if (game.collisions === 1) showWarning('CAREFUL! 1 / 3');
+    if (game.collisions === 2) showWarning('DAMAGE! 2 / 3');
+
+    if (c.damage >= 3) {
+      showWarning('CRITICAL! 3 / 3');
+      updateHUD();
+      const stackIdx = i;
+      setTimeout(() => showRecoveryModal(stackIdx), 350);
+      return;
+    }
+    updateHUD();
+  }
+}
+
+// ============================================================
+//  COMMIT PLACEMENT
+// ============================================================
+function commitPlacement() {
+  const surfaceY = surfaceUnder(active.x, active.x+active.w);
+  active.y = surfaceY - active.h;
+  landContainer();
+}
+
+// ============================================================
+//  SURFACE / SUPPORT HELPERS
+// ============================================================
+function surfaceUnder(qL, qR) {
+  const groundY = canvas.height*GROUND_Y_RATIO;
+  let highest = groundY;
+  for (const c of stack) {
+    const cL=c.x-c.w/2, cR=c.x+c.w/2;
+    if (Math.min(qR,cR)-Math.max(qL,cL)>0 && c.y<highest) highest=c.y;
+  }
+  return highest;
+}
+
+function computeLandingY() { return surfaceUnder(active.x, active.x+active.w)-active.h; }
+
+function topOfStack() {
+  if (!stack.length) return 0;
+  const groundY=canvas.height*GROUND_Y_RATIO;
+  return groundY - Math.min(...stack.map(c=>c.y));
+}
+
+function buildSupportFootprint() {
+  const H=canvas.height, groundY=H*GROUND_Y_RATIO;
+  const newL=active.x, newR=active.x+active.w;
+  const floorY=active.y+active.h;
+  const SURF_TOL=CONTAINER_H*0.6;
+
+  const stackSupports=[];
+  for (const c of stack) {
+    const cL=c.x-c.w/2, cR=c.x+c.w/2;
+    const olap=Math.min(newR,cR)-Math.max(newL,cL);
+    if (olap>1 && Math.abs(c.y-floorY)<SURF_TOL) stackSupports.push({l:Math.max(newL,cL),r:Math.min(newR,cR)});
+  }
+  stackSupports.sort((a,b)=>a.l-b.l);
+  const merged=[];
+  for (const s of stackSupports) {
+    if (!merged.length||s.l>merged[merged.length-1].r+1) merged.push({l:s.l,r:s.r});
+    else merged[merged.length-1].r=Math.max(merged[merged.length-1].r,s.r);
+  }
+
+  const uncovered=[];
+  let cursor=newL;
+  for (const m of merged) { if(m.l>cursor+1)uncovered.push({l:cursor,r:m.l}); cursor=Math.max(cursor,m.r); }
+  if (cursor<newR-1) uncovered.push({l:cursor,r:newR});
+
+  const groundSupports=[];
+  const onGroundLevel=Math.abs(floorY-groundY)<SURF_TOL;
+  if (onGroundLevel) for (const u of uncovered) groundSupports.push(u);
+
+  const all=[...merged,...groundSupports];
+  all.sort((a,b)=>a.l-b.l);
+  const final=[];
+  for (const s of all) {
+    if (!final.length||s.l>final[final.length-1].r+1) final.push({l:s.l,r:s.r});
+    else final[final.length-1].r=Math.max(final[final.length-1].r,s.r);
+  }
+  return final;
+}
+
+// ============================================================
+//  LAND CONTAINER
+// ============================================================
+function landContainer() {
+  const W=canvas.width, H=canvas.height, groundY=H*GROUND_Y_RATIO;
+  const newL=active.x, newR=active.x+active.w, centreX=active.x+active.w/2;
+  const zoneL=W*ZONE_L, zoneR=W*ZONE_R;
+
+  if (newL<zoneL-W*0.02 || newR>zoneR+W*0.02) { triggerCollapse('Outside the loading zone!'); return; }
+
+  const onGround=Math.abs(active.y+active.h-groundY)<PLACEMENT_TOLERANCE;
+  if (onGround) { placeContainer(centreX, 0, null); return; } // null = no perfect on ground
+
+  const supportRanges=buildSupportFootprint();
+  if (!supportRanges.length) { triggerCollapse('No support underneath!'); return; }
+
+  let maxGap=0;
+  for (let i=1;i<supportRanges.length;i++) maxGap=Math.max(maxGap,supportRanges[i].l-supportRanges[i-1].r);
+  if (maxGap>active.w*MAX_OVERHANG+PLACEMENT_TOLERANCE) { triggerCollapse('Fell through the gap!'); return; }
+
+  const supportL=supportRanges[0].l, supportR=supportRanges[supportRanges.length-1].r;
+  const hangL=Math.max(0,supportL-newL), hangR=Math.max(0,newR-supportR);
+  const hangFraction=(hangL+hangR)/active.w;
+  const hangPixels = hangL + hangR;
+  if (hangFraction>MAX_OVERHANG && hangPixels>PLACEMENT_TOLERANCE) { triggerCollapse('Too much overhang!'); return; }
+
+  const biasedCentre=centreX+active.bias*active.w;
+  if (biasedCentre<supportL-PLACEMENT_TOLERANCE||biasedCentre>supportR+PLACEMENT_TOLERANCE) { triggerCollapse('Centre of mass not supported!'); return; }
+
+  const supportCentre=(supportL+supportR)/2;
+  const drift=Math.abs(biasedCentre-supportCentre)/((supportR-supportL)*0.5+active.w*0.5);
+  const instability = Math.min(0.95, hangFraction*1.1+drift*0.6);
+
+  // ── Find the PRIMARY support container (largest horizontal overlap) ──
+  // This is the single container directly beneath the new one we compare against.
+  const floorY = active.y + active.h;
+  const SURF_TOL = CONTAINER_H * 0.6;
+  let primarySupport = null;
+  let bestOverlap = 0;
+  for (const c of stack) {
+    const cL = c.x - c.w / 2;
+    const cR = c.x + c.w / 2;
+    const olap = Math.min(newR, cR) - Math.max(newL, cL);
+    if (olap > bestOverlap && Math.abs(c.y - floorY) < SURF_TOL) {
+      bestOverlap = olap;
+      primarySupport = c;
+    }
+  }
+
+  // Build strict alignment data using actual support container edges
+  let alignData = null;
+  if (primarySupport) {
+    const psL = primarySupport.x - primarySupport.w / 2;
+    const psR = primarySupport.x + primarySupport.w / 2;
+    const psCentre = primarySupport.x;
+    const edgeDiffL = Math.abs(newL - psL);   // how far left edges are apart
+    const edgeDiffR = Math.abs(newR - psR);   // how far right edges are apart
+    const centreOffset = Math.abs(centreX - psCentre);
+    alignData = {
+      centreOffset,
+      overhangFraction: hangFraction,
+      edgeDiffL,
+      edgeDiffR,
+      sameWidth: Math.abs(active.w - primarySupport.w) < 4,
+      primarySupportWidth: primarySupport.w,
+    };
+  }
+
+  placeContainer(centreX, instability, alignData);
+}
+
+function placeContainer(centreX, instability, alignData) {
+  const placed = {
+    x:centreX, y:active.y, w:active.w, h:active.h, color:active.color,
+    instability, damage:0, wobble:0,
+    value: active.value || 1500,   // original value for damage deductions
+    wobbleV: instability>0.45 ? instability*0.06*(Math.random()<0.5?1:-1) : 0,
+    wobbleDecay:0.018+instability*0.008, settled:instability<0.4,
+  };
+  stack.push(placed);
+
+  if (instability>0.35 && stack.length>=2) {
+    const below=stack[stack.length-2];
+    if (!below.settled) below.wobbleV+=(Math.random()-0.5)*0.025*instability;
+  }
+
+  // --- Revenue calculation ---
+  const baseValue = active.value || 1500;
+  const windMult  = WIND_MULT[game.windLevel - 1];
+
+  // ── Perfect / Nice Stack quality check ──
+  // Rules:
+  //   - Never on first container (stack.length <= 1 after push means it was first)
+  //   - Never on ground placement (alignData is null)
+  //   - PERFECT: edges nearly flush OR centred, near-zero overhang, very low instability
+  //   - NICE: reasonably centred, small overhang, decent instability
+  let isPerfect = false;
+  let isNice    = false;
+
+  if (alignData && stack.length > 1) {
+    const oh = alignData.overhangFraction;
+
+    if (alignData.sameWidth) {
+      // Same-width containers: compare left AND right edges directly
+      // Both edge differences must be tiny (≤4px) for a perfect flush
+      const edgePerfect = alignData.edgeDiffL <= 4 && alignData.edgeDiffR <= 4;
+      const edgeNice    = alignData.edgeDiffL <= 14 && alignData.edgeDiffR <= 14;
+      if (edgePerfect && oh < 0.03 && instability < 0.08) {
+        isPerfect = true;
+      } else if (edgeNice && oh < 0.12 && instability < 0.20) {
+        isNice = true;
+      }
+    } else {
+      // Different widths: compare centre alignment and symmetry of overhang
+      // Perfect = nearly dead centre, overhang is nearly equal on both sides
+      const overhangAsymmetry = Math.abs(alignData.edgeDiffL - alignData.edgeDiffR);
+      const centreOffset = alignData.centreOffset;
+      if (centreOffset <= 5 && oh < 0.03 && overhangAsymmetry <= 4 && instability < 0.08) {
+        isPerfect = true;
+      } else if (centreOffset <= 16 && oh < 0.14 && overhangAsymmetry <= 14 && instability < 0.20) {
+        isNice = true;
+      }
+    }
+  }
+
+  // Clean placement for streak (slightly looser than nice)
+  const isClean = instability < 0.25;
+
+  if (isPerfect) { game.perfectCount++; }
+
+  // Streak tracking
+  if (isClean) {
+    game.streak++;
+  } else if (instability > 0.40) {
+    game.streak = 0; // reset streak on rough placement
+  }
+
+  // Streak bonus: +$200 per container in streak (max x8)
+  const streakBonus = game.streak >= 3 ? Math.min(game.streak, 8) * 200 : 0;
+
+  // Risk bonus: 0%/10%/25%/50%
+  let riskPct = 0;
+  let riskLabel = '';
+  if (instability > 0.65)      { riskPct = 0.50; riskLabel = 'RISK BONUS +50%'; }
+  else if (instability > 0.40) { riskPct = 0.25; riskLabel = 'RISK BONUS +25%'; }
+  else if (instability > 0.20) { riskPct = 0.10; riskLabel = 'RISK BONUS +10%'; }
+
+  const riskMult = 1 + riskPct;
+  const earned   = Math.round(baseValue * windMult * riskMult) + streakBonus;
+  game.score += earned;
+  game.stacked++;
+
+  // Wind escalation every 10 containers
+  if (game.stacked % 10 === 0 && game.windLevel < 5) {
+    game.windLevel++;
+    showCombo('WIND UP! x' + WIND_MULT[game.windLevel-1]);
+    SFX.bonus();
+  }
+
+  // Popups and sounds
+  const windBonus = windMult > 1.0;
+  if (isPerfect) {
+    showStreakText('PERFECT STACK', '#ffd700');
+    spawnFloatText(centreX, active.y - 10, '+$500 PERFECT', '#ffd700');
+    game.score += 500; // flat perfect bonus on top of revenue
+    SFX.perfect();
+  } else if (isNice) {
+    showStreakText('NICE STACK', '#aaffcc');
+    spawnFloatText(centreX, active.y - 10, '+$150 NICE', '#aaffcc');
+    game.score += 150;
+    SFX.revenue();
+  } else if (game.streak >= 6) {
+    showStreakText('STABLE OPS x' + game.streak, '#5cc8ff');
+    spawnFloatText(centreX, active.y, '+' + fmtMoney(earned), '#5dffa0');
+    if (riskLabel || windBonus) SFX.bonus(); else SFX.revenue();
+  } else if (game.streak >= 3) {
+    showStreakText('CLEAN x' + game.streak, '#5dffa0');
+    let popupText = '+' + fmtMoney(earned);
+    if (riskLabel) popupText += ' ' + riskLabel;
+    spawnFloatText(centreX, active.y, popupText, '#5dffa0');
+    if (riskLabel || windBonus) SFX.bonus(); else SFX.revenue();
+  } else {
+    let popupText = '+' + fmtMoney(earned);
+    if (windBonus && riskLabel) popupText += ' WIND+RISK';
+    else if (windBonus)          popupText += ' WIND BONUS';
+    else if (riskLabel)          popupText += ' ' + riskLabel;
+    spawnFloatText(centreX, active.y, popupText, '#5dffa0');
+    if (riskLabel || windBonus) SFX.bonus(); else SFX.revenue();
+  }
+
+  spawnLandParticles(centreX, active.y + active.h);
+  addShake(instability > 0.5 ? 4.5 : 2.0);
+  SFX.land(instability);
+  updateHUD();
+  checkChallenges();
+  if (game.score > game.bestScore) { game.bestScore = game.score; localStorage.setItem('csbestScore', game.bestScore); }
+  active = null;
+  setTimeout(spawnContainer, 400);
+}
+
+// ============================================================
+//  STACK WOBBLE
+// ============================================================
+function updateStack(dt) {
+  for (const c of stack) {
+    c.wobbleV+=(-c.wobble*0.08)*dt;
+    c.wobbleV*=Math.pow(1-c.wobbleDecay,dt);
+    c.wobble+=c.wobbleV*dt;
+    if (c.instability>0.6) c.wobbleV+=(Math.random()-0.5)*0.005*dt*c.instability;
+    if (c.instability>0.25) c.wobbleV+=Math.sin(game.windAngle)*0.0007*game.windLevel*c.instability*dt;
+    // Near-critical: amplify wobble for dramatic effect
+    if (Math.abs(c.wobble)>0.20 && c.instability>0.60) {
+      c.wobbleV *= 1.004;
+      addShake(Math.abs(c.wobble) * 3);
+      SFX.creak();
+    }
+    c.wobble=Math.max(-0.40,Math.min(0.40,c.wobble));
+  }
+  for (const c of stack) {
+    if (Math.abs(c.wobble)>0.34&&c.instability>0.68) {
+      // Small dramatic pause before the overlay
+      addShake(8);
+      setTimeout(() => triggerCollapse('The wobble won!'), 220);
+      return;
+    }
+  }
+}
+
+// ============================================================
+//  COLLAPSE
+// ============================================================
+function triggerCollapse(reason, failureType) {
+  if (!game.running) return;
+  game.running = false;
+  game.paused  = false;
+  game.failureType = failureType || 'physics';
+  // Physics collapse: animate containers flying; financial: no collapse animation
+  if (game.failureType === 'physics') {
+    for (const c of stack) spawnCollapseParticles(c.x, c.y+c.h/2, c.color);
+    SFX.collapse();
+    setTimeout(showGameOver, 800);
+  } else {
+    // Financial failure: stack stays visible, overlay appears quickly
+    setTimeout(showGameOver, 300);
+  }
+}
+
+// Failure subtitles
+const PHYSICS_MSGS    = ['"The tower finally gave up."','"Physics wins again."','"That looked stable. Briefly."','"Structural integrity: optional."','"The crane operator has filed a report."'];
+const FINANCIAL_MSGS  = ['"Insufficient recovery funds."','"The accountants have ended operations."','"Container losses exceeded revenue."','"The port is closed. Indefinitely."','"Budget overrun. Goodbye."'];
+
+const EMPTY_RUN_MSGS = [
+  '"No cargo operations completed."',
+  '"The crane operator has filed a report."',
+  '"Operations ended before loading began."',
+  '"Zero containers. Zero revenue. A new record."',
+];
+
+function showGameOver() {
+  const isFin     = game.failureType === 'financial';
+  const isEmptyRun = game.stacked === 0;
+  const titleEl   = document.getElementById('goTitle');
+
+  if (isEmptyRun) {
+    titleEl.textContent = 'OPERATIONS FAILED';
+    titleEl.className   = 'go-title physics';
+    document.getElementById('goMsg').textContent =
+      EMPTY_RUN_MSGS[Math.floor(Math.random() * EMPTY_RUN_MSGS.length)];
+  } else {
+    titleEl.textContent = isFin ? 'PORT OPERATIONS TERMINATED' : 'STACK FAILURE';
+    titleEl.className   = 'go-title ' + (isFin ? 'financial' : 'physics');
+    const msgs = isFin ? FINANCIAL_MSGS : PHYSICS_MSGS;
+    document.getElementById('goMsg').textContent = msgs[Math.floor(Math.random() * msgs.length)];
+  }
+
+  const revenue = game.score;
+  const lost    = game.lostRevenue;
+  const net     = Math.max(0, revenue - lost);
+  const height  = getStackHeightMetres();
+
+  document.getElementById('goScore').textContent   = fmtMoney(revenue);
+  const lostGoEl = document.getElementById('goLost');
+  if (lostGoEl) lostGoEl.textContent = fmtMoney(lost);
+  const netEl = document.getElementById('goNet');
+  if (netEl) netEl.textContent = fmtMoney(net);
+  document.getElementById('goStacked').textContent = game.stacked;
+  const hEl = document.getElementById('goHeight');
+  if (hEl) hEl.textContent = height + 'm';
+
+  // Save run and display top 5
+  const top5 = addToTop5(revenue, lost, height, game.stacked);
+  const listEl = document.getElementById('top5List');
+  if (listEl) {
+    const rankClass = ['rank1','rank2','rank3','',''];
+    // Inject column header once
+    const section = listEl.closest('.top5-section');
+    if (!section.querySelector('.top5-header')) {
+      const hdr = document.createElement('div');
+      hdr.className = 'top5-header';
+      hdr.innerHTML = '<span></span><span>Net</span><span class="col-right">Stack</span><span class="col-right">Height</span>';
+      section.insertBefore(hdr, listEl);
+    }
+    if (top5.length === 0) {
+      listEl.innerHTML = '<li style="color:rgba(255,255,255,.22);font-size:.65rem;grid-column:1/-1;text-align:center;padding:.3rem 0">No records yet</li>';
+    } else {
+      listEl.innerHTML = top5.map((r,i) =>
+        `<li class="${rankClass[i]||''}">` +
+          `<span class="run-rank">#${i+1}</span>` +
+          `<span class="run-net">${fmtMoney(r.net)}</span>` +
+          `<span class="run-stack">${r.stacked||0}</span>` +
+          `<span class="run-ht">${r.height||0}m</span>` +
+        `</li>`
+      ).join('');
+    }
+  }
+
+  document.getElementById('gameOverScreen').classList.remove('hidden');
+
+  // Fade mobile controls during game over
+  const mc = document.getElementById('mobileControls');
+  if (mc) mc.classList.add('faded');
+
+  // Animate dashboard slide-in
+  const dash = document.getElementById('goDashboard');
+  if (dash) { dash.classList.remove('go-dashboard'); void dash.offsetWidth; dash.classList.add('go-dashboard'); }
+
+  // Count-up animation for the three main numbers
+  animateCountUp('goScore',  revenue, 520);
+  animateCountUp('goLost',   lost,    680);
+  animateCountUp('goNet',    net,     900);
+}
+
+function animateCountUp(id, targetValue, durationMs) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const start = performance.now();
+  function step(now) {
+    const t = Math.min(1, (now - start) / durationMs);
+    // Ease out cubic
+    const eased = 1 - Math.pow(1 - t, 3);
+    el.textContent = fmtMoney(Math.round(targetValue * eased));
+    if (t < 1) requestAnimationFrame(step);
+    else el.textContent = fmtMoney(targetValue);
+  }
+  requestAnimationFrame(step);
+}
+
+// Recovery modal — pauses physics but keeps loop running for rendering
+function showRecoveryModal(stackIdx) {
+  if (!game.running || game.paused) return;
+  game.paused = true;
+  recoveryPendingIdx = stackIdx;
+  const c = stack[stackIdx];
+  const recoveryCost = Math.round((c.value || 1500) * 0.5);
+  // Affordability check up-front — if can't afford, skip modal and end immediately
+  if (game.score < recoveryCost) {
+    game.paused = false;
+    spawnFloatText(canvas.width/2, canvas.height*0.45, 'INSUFFICIENT FUNDS!', '#ff5555');
+    setTimeout(() => triggerCollapse('Not enough revenue to cover replacement cost.', 'financial'), 700);
+    return;
+  }
+  document.getElementById('recoveryCost').textContent = 'Recovery Cost: ' + fmtMoney(recoveryCost);
+  document.getElementById('recoveryModal').classList.remove('hidden');
+}
+
+// ============================================================
+//  PARTICLES
+// ============================================================
+function spawnLandParticles(cx,y) {
+  for(let i=0;i<10;i++) particles.push({x:cx+(Math.random()-.5)*40,y,vx:(Math.random()-.5)*3,vy:-Math.random()*3-1,life:1,decay:Math.random()*.04+.03,r:Math.random()*3+2,color:'#ffffff'});
+}
+function spawnFloatText(x, y, text, color) {
+  const el = document.createElement('div');
+  el.className = 'float-popup';
+  el.textContent = text;
+  el.style.color = color || '#fff';
+  el.style.left = Math.max(4, Math.min(canvas.width - 120, x - 40)) + 'px';
+  el.style.top  = (y - 10) + 'px';
+  wrapper.appendChild(el);
+  setTimeout(() => el.remove(), 1700);
+}
+
+function spawnCollapseParticles(cx,cy,color) {
+  for(let i=0;i<14;i++){const a=Math.random()*Math.PI*2,sp=Math.random()*5+2; particles.push({x:cx+(Math.random()-.5)*30,y:cy,vx:Math.cos(a)*sp,vy:Math.sin(a)*sp-2,life:1,decay:Math.random()*.025+.02,r:Math.random()*4+3,color});}
+}
+function updateParticles(dt) {
+  for(let i=particles.length-1;i>=0;i--){const p=particles[i];p.x+=p.vx*dt;p.y+=p.vy*dt;p.vy+=0.18*dt;p.life-=p.decay*dt;if(p.life<=0)particles.splice(i,1);}
+}
+
+// ============================================================
+//  RENDER
+// ============================================================
+function renderFrame() {
+  const W=canvas.width,H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+  // Apply subtle camera pan/zoom
+  ctx.save();
+  const pivotX = W * 0.5;
+  const pivotY = H * GROUND_Y_RATIO;
+  ctx.translate(pivotX + cam.shakeX, pivotY + cam.shakeY);
+  ctx.scale(cam.zoom, cam.zoom);
+  ctx.translate(-pivotX, -pivotY + cam.offsetY);
+  drawBg(W,H); drawCrane(W,H); drawStack(); if(active)drawActive(); drawParticles(); drawPlatform(W,H);
+  ctx.restore();
+}
+
+function drawBg(W,H) {
+  const sky=ctx.createLinearGradient(0,0,0,H*.65);
+  sky.addColorStop(0,'#04091a');sky.addColorStop(.6,'#0a1535');sky.addColorStop(1,'#0d1e45');
+  ctx.fillStyle=sky;ctx.fillRect(0,0,W,H*.65);
+  for(const s of bgStars){ctx.beginPath();ctx.arc(s.x*W,s.y*H,s.r,0,Math.PI*2);ctx.fillStyle=`rgba(255,255,255,${s.alpha*(0.7+0.3*Math.sin(s.twinkle))})`;ctx.fill();}
+  ctx.beginPath();ctx.arc(W*.82,H*.1,18,0,Math.PI*2);ctx.fillStyle='#f0e68c';ctx.fill();
+  ctx.beginPath();ctx.arc(W*.85,H*.09,15,0,Math.PI*2);ctx.fillStyle='#0a1535';ctx.fill();
+  const wg=ctx.createLinearGradient(0,H*.62,0,H);wg.addColorStop(0,'#0d2a4a');wg.addColorStop(1,'#071420');ctx.fillStyle=wg;ctx.fillRect(0,H*.62,W,H*.38);
+  // Water shimmer — two layers for depth
+  const t = Date.now() * 0.001;
+  for(let i=0;i<7;i++){
+    const wx=((t*0.28+i*.65)%1)*W;
+    const wy=H*.635+i*5;
+    const ww=W*(0.04+Math.sin(i*1.3+t*.15)*0.02);
+    ctx.beginPath();ctx.moveTo(wx,wy);ctx.lineTo(wx+ww,wy);
+    ctx.strokeStyle=`rgba(255,255,255,${.025+i*.008})`;ctx.lineWidth=1;ctx.stroke();
+  }
+  // Soft water reflection glow near horizon
+  const refGrad=ctx.createLinearGradient(0,H*.62,0,H*.72);
+  refGrad.addColorStop(0,'rgba(13,42,74,0.0)');
+  refGrad.addColorStop(0.5,'rgba(30,80,140,0.06)');
+  refGrad.addColorStop(1,'rgba(13,42,74,0.0)');
+  ctx.fillStyle=refGrad;ctx.fillRect(0,H*.62,W,H*.10);
+  ctx.fillStyle='#071628';
+  for(const[bx,by,bw,bh]of[[.05,.58,.04,.07],[.10,.55,.05,.10],[.16,.57,.03,.08],[.20,.53,.06,.12],[.27,.56,.04,.09],[.32,.58,.05,.07],[0,.60,.05,.05]])ctx.fillRect(bx*W,by*H,bw*W,bh*H);
+  ctx.fillStyle='#ffee88';
+  for(const[bx,by,bw,bh]of[[.05,.58,.04,.07],[.10,.55,.05,.10],[.16,.57,.03,.08],[.20,.53,.06,.12],[.27,.56,.04,.09],[.32,.58,.05,.07],[0,.60,.05,.05]])
+    for(let r=0;r<Math.floor(bh*H/8);r++)for(let c=0;c<Math.floor(bw*W/6);c++)if((bx*100+r*7+c*3)%5>1)ctx.fillRect(bx*W+c*6+1,by*H+r*8+1,3,4);
+  for(const l of bgLights){ctx.beginPath();ctx.arc(l.x*W,l.y*H,4,0,Math.PI*2);ctx.fillStyle=l.color;ctx.globalAlpha=0.6+0.4*Math.sin(l.phase);ctx.fill();ctx.globalAlpha=1;}
+  for(const b of bgBoats){ctx.save();ctx.translate(b.x*W,H*.67);ctx.scale(b.size,b.size);ctx.fillStyle='#0e2240';ctx.beginPath();ctx.moveTo(-18,0);ctx.lineTo(18,0);ctx.lineTo(14,-8);ctx.lineTo(-12,-8);ctx.closePath();ctx.fill();ctx.strokeStyle='#1a3555';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(0,-8);ctx.lineTo(0,-22);ctx.stroke();ctx.restore();}
+
+  // Subtle atmospheric fog drift (always-on, very faint)
+  const fogAlpha = 0.028 + 0.012 * Math.sin(t * 0.18);
+  const fogGrad = ctx.createLinearGradient(0, H*0.55, W, H*0.65);
+  fogGrad.addColorStop(0, `rgba(120,160,200,${fogAlpha})`);
+  fogGrad.addColorStop(0.4, 'rgba(120,160,200,0)');
+  fogGrad.addColorStop(0.6, 'rgba(120,160,200,0)');
+  fogGrad.addColorStop(1, `rgba(120,160,200,${fogAlpha * 0.6})`);
+  ctx.fillStyle = fogGrad;
+  ctx.fillRect(0, H*0.55, W, H*0.12);
+
+  // Wind level 3+: warning beacon flashes on distant buildings
+  if (game.windLevel >= 3) {
+    const beaconAlpha = 0.4+0.4*Math.sin(Date.now()*0.008*(game.windLevel-1));
+    ctx.fillStyle=`rgba(255,60,60,${beaconAlpha})`;
+    ctx.beginPath();ctx.arc(W*0.22,H*0.53,3,0,Math.PI*2);ctx.fill();
+    ctx.beginPath();ctx.arc(W*0.30,H*0.56,3,0,Math.PI*2);ctx.fill();
+  }
+
+  // Wind level 4+: rain streaks
+  if (game.windLevel >= 4 && rainParticles.length) {
+    ctx.strokeStyle=`rgba(180,210,255,0.22)`;ctx.lineWidth=1;
+    for (const r of rainParticles) {
+      ctx.globalAlpha=r.life*0.35;
+      ctx.beginPath();ctx.moveTo(r.x*W,r.y*H);ctx.lineTo((r.x+r.vx*r.len)*W,(r.y+r.len)*H);ctx.stroke();
+    }
+    ctx.globalAlpha=1;
+  }
+
+  // Lightning flash overlay
+  if (lightningAlpha > 0) {
+    ctx.fillStyle=`rgba(200,220,255,${lightningAlpha})`;
+    ctx.fillRect(0,0,W,H);
+  }
+}
+
+function drawPlatform(W,H) {
+  const groundY=H*GROUND_Y_RATIO, zL=W*ZONE_L, zR=W*ZONE_R;
+  ctx.fillStyle='#1a2540';ctx.fillRect(W*.08,groundY,W*.84,H-groundY);
+  ctx.fillStyle='#253560';ctx.fillRect(W*.08,groundY,W*.84,6);
+  ctx.fillStyle='#ffd700';ctx.fillRect(zL,groundY,zR-zL,4);
+  ctx.fillRect(zL-2,groundY-8,4,12);ctx.fillRect(zR-2,groundY-8,4,12);
+  ctx.fillStyle='rgba(255,215,0,.4)';ctx.font=`bold ${Math.round(W*.024)}px sans-serif`;ctx.textAlign='center';
+  ctx.fillText('LOADING ZONE',W*.5,groundY+18);ctx.textAlign='left';
+  for(const bx of[.28,.50,.72]){ctx.fillStyle='#2a3d6a';ctx.beginPath();ctx.roundRect(bx*W-4,groundY+3,8,12,2);ctx.fill();ctx.fillStyle='#3d5490';ctx.fillRect(bx*W-5,groundY+2,10,3);}
+}
+
+function drawCrane(W,H) {
+  const gY=H*GROUND_Y_RATIO,cX=W*.72,tY=H*.08;
+  ctx.strokeStyle='#1e3a6e';ctx.lineWidth=10;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(cX-22,gY);ctx.lineTo(cX-8,tY+60);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cX+10,gY);ctx.lineTo(cX+8,tY+60);ctx.stroke();
+  ctx.lineWidth=12;ctx.beginPath();ctx.moveTo(cX,gY);ctx.lineTo(cX,tY);ctx.stroke();
+  ctx.lineWidth=3;ctx.strokeStyle='#162d57';
+  for(let i=0;i<4;i++){const y1=tY+60+i*((gY-tY-60)/4),y2=tY+60+(i+1)*((gY-tY-60)/4);ctx.beginPath();ctx.moveTo(cX-10,y1);ctx.lineTo(cX+6,y2);ctx.stroke();ctx.beginPath();ctx.moveTo(cX+6,y1);ctx.lineTo(cX-10,y2);ctx.stroke();}
+  ctx.lineWidth=8;ctx.strokeStyle='#2a4f8f';ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(cX-W*.45,tY+20);ctx.lineTo(crane.armRight||W*.88,tY+20);ctx.stroke();
+  ctx.lineWidth=2;ctx.strokeStyle='#1e3a6e';
+  ctx.beginPath();ctx.moveTo(cX,tY);ctx.lineTo(cX-W*.35,tY+20);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(cX,tY);ctx.lineTo(W*.84,tY+20);ctx.stroke();
+  ctx.fillStyle='#f5a623';ctx.beginPath();ctx.roundRect(cX-14,tY+10,28,22,3);ctx.fill();
+  ctx.fillStyle='rgba(0,0,0,.3)';ctx.fillRect(cX-10,tY+13,20,10);
+  const wa=0.5+0.5*Math.sin(Date.now()*.006);
+  ctx.beginPath();ctx.arc(cX-W*.45,tY+18,4,0,Math.PI*2);ctx.fillStyle=`rgba(255,60,60,${wa})`;ctx.fill();
+  ctx.beginPath();ctx.arc(W*.84,tY+18,4,0,Math.PI*2);ctx.fillStyle=`rgba(255,60,60,${wa})`;ctx.fill();
+  if(active){
+    ctx.fillStyle='#2a4f8f';ctx.beginPath();ctx.roundRect(crane.x-7,tY+15,14,9,2);ctx.fill();
+    const sx=crane.x,sy=tY+24,ex=active.x+active.w/2,ey=active.y;
+    const mx=(sx+ex)/2+(active.swingAngle||0)*8,my=(sy+ey)/2-Math.abs(ex-sx)*.08;
+    ctx.strokeStyle='#8aacce';ctx.lineWidth=2;
+    ctx.beginPath();ctx.moveTo(sx,sy);ctx.quadraticCurveTo(mx,my,ex,ey);ctx.stroke();
+    ctx.beginPath();ctx.moveTo(sx+3,sy);ctx.quadraticCurveTo(mx+3,my,ex+3,ey);ctx.stroke();
+  }
+}
+
+function drawActive() {
+  ctx.save();
+  const cx=active.x+active.w/2,cy=active.y+active.h/2;
+  ctx.translate(cx,cy);
+  if(active.state==='hanging')ctx.rotate(active.swingAngle*0.3);
+  ctx.translate(-active.w/2,-active.h/2);
+  drawBox(0,0,active.w,active.h,active.color,1,false,0,active.sizeIdx||0);
+  ctx.restore();
+}
+
+function drawStack() {
+  for(const c of stack){
+    ctx.save();
+    ctx.translate(c.x,c.y+c.h/2);ctx.rotate(c.wobble*0.08);ctx.translate(-c.w/2,-c.h/2);
+    drawBox(0,0,c.w,c.h,c.color,1,c.instability>0.5,c.damage||0,c.sizeIdx||0);
+    ctx.restore();
+  }
+}
+
+// Shipping company markings per size
+const COMPANY_LABELS = ['PORTEX', 'STACKLINE', 'TEUFORCE'];
+// Assign a stable label from color index (passed as sizeIdx here for variety)
+
+function drawBox(x,y,w,h,color,alpha,glowing,damage,sizeIdx) {
+  ctx.globalAlpha = alpha;
+  ctx.save();
+  // Clip all drawing to container bounds
+  ctx.beginPath(); ctx.roundRect(x, y, w, h, 3); ctx.clip();
+
+  // ── 1. Base body fill ──
+  ctx.fillStyle = color;
+  ctx.fillRect(x, y, w, h);
+
+  // ── 2. Top-to-bottom gradient shading (depth) ──
+  const bodyGrad = ctx.createLinearGradient(x, y, x, y+h);
+  bodyGrad.addColorStop(0,   'rgba(255,255,255,0.14)'); // bright top
+  bodyGrad.addColorStop(0.3, 'rgba(255,255,255,0.04)');
+  bodyGrad.addColorStop(0.7, 'rgba(0,0,0,0.08)');
+  bodyGrad.addColorStop(1,   'rgba(0,0,0,0.28)');       // dark bottom
+  ctx.fillStyle = bodyGrad;
+  ctx.fillRect(x, y, w, h);
+
+  // ── 3. Side-to-side gradient (left lighter, right slightly darker) ──
+  const sideGrad = ctx.createLinearGradient(x, y, x+w, y);
+  sideGrad.addColorStop(0,   'rgba(255,255,255,0.06)');
+  sideGrad.addColorStop(0.5, 'rgba(255,255,255,0.00)');
+  sideGrad.addColorStop(1,   'rgba(0,0,0,0.10)');
+  ctx.fillStyle = sideGrad;
+  ctx.fillRect(x, y, w, h);
+
+  // ── 4. Vertical corrugated ridges ──
+  const ridgeCount = Math.max(3, Math.round(w / 14));
+  const ridgeSpacing = (w - 12) / ridgeCount;
+  ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+  ctx.lineWidth = 1;
+  for (let i = 1; i < ridgeCount; i++) {
+    const rx = x + 6 + i * ridgeSpacing;
+    ctx.beginPath(); ctx.moveTo(rx, y+2); ctx.lineTo(rx, y+h-2); ctx.stroke();
+    // Subtle highlight on right side of each ridge
+    ctx.strokeStyle = 'rgba(255,255,255,0.07)';
+    ctx.beginPath(); ctx.moveTo(rx+1, y+2); ctx.lineTo(rx+1, y+h-2); ctx.stroke();
+    ctx.strokeStyle = 'rgba(0,0,0,0.18)';
+  }
+
+  // ── 5. Corner castings (reinforced corners) ──
+  const cSize = Math.min(7, h * 0.22);
+  ctx.fillStyle = 'rgba(0,0,0,0.45)';
+  // Bottom-left, bottom-right, top-left, top-right outer blocks
+  ctx.fillRect(x,     y,       cSize,   cSize);
+  ctx.fillRect(x+w-cSize, y,   cSize,   cSize);
+  ctx.fillRect(x,     y+h-cSize, cSize, cSize);
+  ctx.fillRect(x+w-cSize, y+h-cSize, cSize, cSize);
+  // Corner latch holes
+  ctx.fillStyle = 'rgba(0,0,0,0.65)';
+  const holeR = Math.max(1.5, cSize * 0.32);
+  const offsets = [[cSize/2,cSize/2],[w-cSize/2,cSize/2],[cSize/2,h-cSize/2],[w-cSize/2,h-cSize/2]];
+  for (const [ox,oy] of offsets) {
+    ctx.beginPath(); ctx.arc(x+ox, y+oy, holeR, 0, Math.PI*2); ctx.fill();
+  }
+  // Corner highlight rim
+  ctx.strokeStyle = 'rgba(255,255,255,0.22)';
+  ctx.lineWidth = 1;
+  for (const [ox,oy] of offsets) {
+    ctx.beginPath(); ctx.arc(x+ox, y+oy, holeR+1, 0, Math.PI*2); ctx.stroke();
+  }
+
+  // ── 6. Top edge highlight stripe ──
+  const topHighlight = ctx.createLinearGradient(x, y, x, y+4);
+  topHighlight.addColorStop(0, 'rgba(255,255,255,0.30)');
+  topHighlight.addColorStop(1, 'rgba(255,255,255,0.00)');
+  ctx.fillStyle = topHighlight;
+  ctx.fillRect(x+cSize, y, w-cSize*2, 4);
+
+  // ── 7. Bottom shadow edge ──
+  ctx.fillStyle = 'rgba(0,0,0,0.30)';
+  ctx.fillRect(x+cSize, y+h-3, w-cSize*2, 3);
+
+  // ── 8. Shipping company label ──
+  const label = COMPANY_LABELS[sizeIdx % COMPANY_LABELS.length];
+  const fontSize = Math.max(5, Math.min(9, h * 0.28));
+  ctx.font = `bold ${fontSize}px monospace`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  // Dark shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.50)';
+  ctx.fillText(label, x+w/2+1, y+h*0.5+1);
+  // White text
+  ctx.fillStyle = 'rgba(255,255,255,0.55)';
+  ctx.fillText(label, x+w/2, y+h*0.5);
+  // Container door line (centre vertical)
+  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(x+w/2, y+cSize+2); ctx.lineTo(x+w/2, y+h-cSize-2); ctx.stroke();
+
+  ctx.restore(); // end clip
+
+  // ── 9. Damage system ──
+  if (damage && damage > 0) {
+    ctx.save();
+    ctx.beginPath(); ctx.roundRect(x+1, y+1, w-2, h-2, 2); ctx.clip();
+
+    // Dark bruising overlay
+    ctx.fillStyle = `rgba(0,0,0,${0.28 + damage * 0.18})`;
+    ctx.fillRect(x, y, w, h);
+    // Rust/scorch tint
+    ctx.fillStyle = `rgba(70,18,0,${0.18 + damage * 0.14})`;
+    ctx.fillRect(x, y, w, h);
+    // Damage 2+: darker scorch patch
+    if (damage >= 2) {
+      ctx.fillStyle = 'rgba(90,22,0,0.32)';
+      ctx.fillRect(x + w*0.15, y, w*0.70, h);
+    }
+
+    // Scratched paint streaks (horizontal scrapes)
+    if (damage >= 1) {
+      for (let s = 0; s < 3; s++) {
+        const sy = y + h * (0.25 + s * 0.22);
+        const sx = x + w * (0.08 + Math.sin(s * 2.3) * 0.06);
+        const ex = x + w * (0.55 + Math.cos(s * 1.7) * 0.15);
+        ctx.strokeStyle = `rgba(255,200,140,${0.12 + s * 0.04})`;
+        ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.moveTo(sx, sy); ctx.lineTo(ex, sy + 0.8); ctx.stroke();
+      }
+    }
+
+    // Crack drawing helper: dark shadow + bright highlight
+    ctx.lineCap = 'round'; ctx.lineJoin = 'round';
+    function crack(pts, wt) {
+      ctx.strokeStyle = 'rgba(0,0,0,0.92)';
+      ctx.lineWidth = (wt || 1.5) + 1.8;
+      ctx.beginPath(); ctx.moveTo(pts[0], pts[1]);
+      for (let k = 2; k < pts.length; k += 2) ctx.lineTo(pts[k], pts[k+1]);
+      ctx.stroke();
+      ctx.strokeStyle = 'rgba(255,230,160,0.88)';
+      ctx.lineWidth = wt || 1.5;
+      ctx.beginPath(); ctx.moveTo(pts[0], pts[1]);
+      for (let k = 2; k < pts.length; k += 2) ctx.lineTo(pts[k], pts[k+1]);
+      ctx.stroke();
+    }
+
+    if (damage >= 1) {
+      crack([x+w*0.24,y+1,  x+w*0.27,y+h*0.28,  x+w*0.20,y+h*0.55,  x+w*0.24,y+h*0.78,  x+w*0.21,y+h-1], 1.8);
+      crack([x+w*0.27,y+h*0.28,  x+w*0.40,y+h*0.20], 1.2);
+      crack([x+w*0.20,y+h*0.55,  x+w*0.36,y+h*0.60], 1.0);
+    }
+    if (damage >= 2) {
+      crack([x+w*0.73,y+2,  x+w*0.68,y+h*0.36,  x+w*0.75,y+h*0.60,  x+w*0.70,y+h-1], 1.8);
+      crack([x+w*0.68,y+h*0.36,  x+w*0.55,y+h*0.40], 1.2);
+      crack([x+w*0.75,y+h*0.60,  x+w*0.59,y+h*0.64], 1.0);
+      crack([x+w*0.21,y+h*0.50,  x+w*0.35,y+h*0.46,  x+w*0.52,y+h*0.50,  x+w*0.66,y+h*0.47,  x+w*0.73,y+h*0.50], 1.5);
+      crack([x+w*0.09,y+h*0.28,  x+w*0.17,y+h*0.40,  x+w*0.11,y+h*0.53], 1.0);
+    }
+    if (damage >= 3) {
+      const pulse = 0.28 + 0.20 * Math.sin(Date.now() * 0.012);
+      ctx.fillStyle = `rgba(175,35,0,${pulse})`; ctx.fillRect(x, y, w, h);
+      crack([x+w*0.50,y+1,   x+w*0.49,y+h*0.18,  x+w*0.51,y+h*0.40], 2.2);
+      crack([x+w*0.51,y+h*0.40,  x+w*0.35,y+h*0.66,  x+w*0.39,y+h-1], 1.9);
+      crack([x+w*0.51,y+h*0.40,  x+w*0.65,y+h*0.68,  x+w*0.61,y+h-1], 1.9);
+      crack([x+w*0.51,y+h*0.40,  x+w*0.24,y+h*0.50,  x+w*0.09,y+h*0.46], 1.6);
+      crack([x+w*0.51,y+h*0.40,  x+w*0.76,y+h*0.48,  x+w*0.91,y+h*0.44], 1.6);
+      crack([x+w*0.35,y+h*0.66,  x+w*0.27,y+h*0.80,  x+w*0.31,y+h-1], 1.1);
+      crack([x+w*0.65,y+h*0.68,  x+w*0.73,y+h*0.81,  x+w*0.69,y+h-1], 1.1);
+      crack([x+w*0.14,y+h*0.18,  x+w*0.21,y+h*0.33], 1.0);
+      crack([x+w*0.81,y+h*0.23,  x+w*0.75,y+h*0.37], 1.0);
+      // Pulsing red danger border
+      ctx.strokeStyle = `rgba(255,55,0,${0.45 + 0.28*Math.sin(Date.now()*0.012)})`;
+      ctx.lineWidth = 2.5; ctx.lineCap = 'square';
+      ctx.beginPath(); ctx.roundRect(x+1, y+1, w-2, h-2, 2); ctx.stroke();
+    }
+
+    ctx.restore();
+  }
+
+  // ── 10. Instability glow ──
+  if (glowing) {
+    ctx.strokeStyle = `rgba(255,80,80,${0.28+0.28*Math.sin(Date.now()*.01)})`;
+    ctx.lineWidth = 3;
+    ctx.beginPath(); ctx.roundRect(x, y, w, h, 3); ctx.stroke();
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic'; // reset canvas text state
+}
+
+function drawParticles() {
+  for(const p of particles){ctx.beginPath();ctx.arc(p.x,p.y,p.r*p.life,0,Math.PI*2);ctx.fillStyle=p.color;ctx.globalAlpha=p.life*.8;ctx.fill();}
+  ctx.globalAlpha=1;
+}
+
+// ============================================================
+//  HUD
+// ============================================================
+function fmtMoney(v) {
+  if (v >= 1000000) return '$' + (v/1000000).toFixed(1) + 'M';
+  if (v >= 1000)    return '$' + (v/1000).toFixed(1).replace(/\.0$/,'') + 'k';
+  return '$' + v;
+}
+
+function updateHUD() {
+  document.getElementById('hudScore').textContent = fmtMoney(game.score);
+  const lostEl = document.getElementById('hudLost');
+  if (lostEl) lostEl.textContent = fmtMoney(game.lostRevenue);
+  const hEl = document.getElementById('hudHeight');
+  if (hEl) hEl.textContent = getStackHeightMetres() + 'm';
+  // Wind pips — hidden from player, but kept in DOM for internal escalation
+  // Collision pips
+  for(let i=0;i<3;i++){
+    const p=document.getElementById('cp'+i);
+    if(!p)continue;
+    p.className='col-pip';
+    if(i<game.collisions){
+      if(game.collisions===1)p.classList.add('hit1');
+      else if(game.collisions===2)p.classList.add('hit2');
+      else p.classList.add('hit3');
+    }
+  }
+}
+
+function showCombo(text) {
+  const el=document.getElementById('comboFlash');
+  el.textContent=text;el.style.opacity='1';
+  clearTimeout(comboTimeout);
+  comboTimeout=setTimeout(()=>{el.style.opacity='0';},1200);
+}
+
+let streakTimeout = null;
+function showStreakText(text, color) {
+  const el = document.getElementById('streakBadge');
+  if (!el) return;
+  el.textContent = text;
+  el.style.color = color || '#ffd700';
+  el.style.textShadow = `0 0 20px ${color||'#ffd700'}`;
+  el.classList.add('pop');
+  clearTimeout(streakTimeout);
+  streakTimeout = setTimeout(() => { el.classList.remove('pop'); }, 1400);
+}
+
+let challengeFlashTimeout = null;
+function showChallengeFlash(text) {
+  const el = document.getElementById('challengeFlash');
+  if (!el) return;
+  el.innerHTML = '&#9989; CHALLENGE<br><span style="font-size:.75rem;font-weight:600;color:rgba(255,255,255,.8)">' + text + '</span>';
+  el.classList.add('pop');
+  clearTimeout(challengeFlashTimeout);
+  challengeFlashTimeout = setTimeout(() => { el.classList.remove('pop'); }, 2800);
+}
+
+function showWarning(text) {
+  const el=document.getElementById('warningFlash');
+  el.textContent=text;el.style.opacity='1';el.style.transform='translate(-50%,-50%) scale(1.1)';
+  clearTimeout(warningTimeout);
+  warningTimeout=setTimeout(()=>{el.style.opacity='0';el.style.transform='translate(-50%,-50%) scale(1)';},1100);
+}
+
+// ============================================================
+//  INPUT
+// ============================================================
+document.addEventListener('keydown',e=>{
+  if(!game.running)return;
+  switch(e.code){
+    case 'ArrowLeft':case'KeyA':keys.left=true;e.preventDefault();break;
+    case 'ArrowRight':case'KeyD':keys.right=true;e.preventDefault();break;
+    case 'ArrowUp':case'KeyW':keys.up=true;e.preventDefault();break;
+    case 'ArrowDown':case'KeyS':keys.down=true;e.preventDefault();break;
+    case 'Space':e.preventDefault();if(active&&active.state==='hanging')dropTriggered=true;break;
+  }
+});
+document.addEventListener('keyup',e=>{
+  switch(e.code){
+    case 'ArrowLeft':case'KeyA':keys.left=false;break;
+    case 'ArrowRight':case'KeyD':keys.right=false;break;
+    case 'ArrowUp':case'KeyW':keys.up=false;break;
+    case 'ArrowDown':case'KeyS':keys.down=false;break;
+  }
+});
+
+function setupMobileBtn(id,keyName,isDrop){
+  const el=document.getElementById(id);if(!el)return;
+  const press=e=>{e.preventDefault();if(isDrop){if(active&&active.state==='hanging')dropTriggered=true;}else{keys[keyName]=true;el.classList.add('pressed');}};
+  const release=e=>{e.preventDefault();if(!isDrop){keys[keyName]=false;el.classList.remove('pressed');}};
+  el.addEventListener('touchstart',press,{passive:false});el.addEventListener('touchend',release,{passive:false});
+  el.addEventListener('mousedown',press);el.addEventListener('mouseup',release);el.addEventListener('mouseleave',release);
+}
+setupMobileBtn('btnLeft','left',false);setupMobileBtn('btnRight','right',false);
+setupMobileBtn('btnUp','up',false);setupMobileBtn('btnDown','down',false);
+setupMobileBtn('btnDrop','',true);
+
+document.getElementById('startBtn').addEventListener('click', () => { SFX.click(); startGame(); });
+
+// How To Play navigation
+document.getElementById('howToBtn').addEventListener('click', () => {
+  SFX.click();
+  document.getElementById('startScreen').classList.add('hidden');
+  document.getElementById('howToScreen').classList.remove('hidden');
+});
+document.getElementById('htpBackBtn').addEventListener('click', () => {
+  SFX.click();
+  document.getElementById('howToScreen').classList.add('hidden');
+  document.getElementById('startScreen').classList.remove('hidden');
+});
+document.getElementById('htpStartBtn').addEventListener('click', () => { SFX.click(); startGame(); });
+document.getElementById('playAgainBtn').addEventListener('click',()=>{document.getElementById('gameOverScreen').classList.add('hidden');startGame();});
+function resetBest(){game.bestScore=0;localStorage.removeItem('csbestScore');localStorage.removeItem('csTop5');localStorage.removeItem('csTop5Runs');}
+document.getElementById('resetBestBtn').addEventListener('click',resetBest);
+document.getElementById('resetBestBtn2').addEventListener('click',resetBest);
+
+// Sound: mute button
+(function(){
+  const btn = document.getElementById('muteBtn');
+  function upd() { btn.innerHTML = SFX.isMuted() ? '&#128263;' : '&#128266;'; }
+  upd();
+  btn.addEventListener('click', () => { SFX.toggle(); upd(); SFX.click(); });
+})();
+// Sound: UI button clicks
+['playAgainBtn','btnRecover','btnAbandon'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('pointerdown', () => SFX.click());
+});
+
+// ============================================================
+//  IDLE LOOP
+// ============================================================
+function idleLoop() {
+  // Stop idle loop once the main game loop has taken over
+  if(game.running)return;
+  const W=canvas.width,H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+  game.windAngle+=0.012;
+  updateBackground(1);updateParticles(1);if(stack.length)updateStack(1);
+  drawBg(W,H);drawCrane(W,H);drawStack();drawParticles();drawPlatform(W,H);
+  requestAnimationFrame(idleLoop);
+}
+
+// ============================================================
+//  RECOVERY MODAL HANDLERS
+// ============================================================
+document.getElementById('btnRecover').addEventListener('click', () => {
+  const idx = recoveryPendingIdx;
+  if (idx < 0 || idx >= stack.length) {
+    document.getElementById('recoveryModal').classList.add('hidden');
+    game.paused = false;
+    return;
+  }
+  const c = stack[idx];
+  const recoveryCost = Math.round((c.value || 1500) * 0.5);
+
+  // Deduct cost from revenue, add to lost revenue
+  game.score -= recoveryCost;
+  game.lostRevenue += recoveryCost;
+  spawnFloatText(c.x, c.y - 10, 'RECOVERY -' + fmtMoney(recoveryCost), '#ffaa33');
+
+  // Remove the destroyed container from the stack
+  stack.splice(idx, 1);
+  recoveryPendingIdx = -1;
+
+  // Hide modal and unpause
+  document.getElementById('recoveryModal').classList.add('hidden');
+  game.paused = false;
+
+  // Reset lastTime so dt doesn't spike on resume
+  lastTime = performance.now();
+
+  // Clear any stale active container, then spawn fresh one
+  active = null;
+  updateHUD();
+  spawnContainer();
+  // loop is already running (was paused, not stopped) — no need to re-call rAF
+});
+
+document.getElementById('btnAbandon').addEventListener('click', () => {
+  document.getElementById('recoveryModal').classList.add('hidden');
+  triggerCollapse('Port abandoned!', 'financial');
+});
+
+// ============================================================
+//  RESIZE
+// ============================================================
+function resize(){
+  canvas.width=wrapper.clientWidth;canvas.height=wrapper.clientHeight;
+  if(game.running)renderFrame();
+}
+window.addEventListener('resize',resize);
+resize();
+initBackground();
+renderChallengePanel();
+crane.x=canvas.width*.72;crane.y=canvas.height*CRANE_Y_RATIO;crane.armRight=canvas.width*.88;
+idleLoop();
+</script>
+</body>
+</html>
