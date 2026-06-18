@@ -58,20 +58,10 @@
   }
   #la-footer .la-footer-link:hover,
   #la-footer .la-footer-link:active { color: #FFD700; }
-  /* Game pages: footer sits below the game, never overlaps controls */
-  body.la-game-page {
-    display: flex;
-    flex-direction: column;
-    min-height: 100vh;
-  }
-  body.la-game-page #root {
-    flex: 1;
-    min-height: 0;
-  }
   /* ──────────────────────────────────────────────────────── */
   </style>
 </head>
-<body class="la-game-page">
+<body>
   <div id="root"></div>
 
   <!-- React + ReactDOM (production) -->
@@ -83,6 +73,9 @@
   <script type="text/babel" data-presets="react">
     // Destructure React hooks from global React object
     const { useState, useEffect, useRef, useCallback } = React;
+
+    // Footer version — change this single value to update the footer everywhere
+    const LA_VERSION = "0.1";
 
 
 // ============================================================
@@ -1241,6 +1234,7 @@ function CargoRun() {
             onMouseLeave={e => { e.currentTarget.style.color="#444";    e.currentTarget.style.borderColor="#2a2a3a"; }}
           >🕹 ARCADE</a>
         </div>
+        <Footer />
       </div>
     );
   }
@@ -1379,6 +1373,7 @@ function CargoRun() {
         <div style={{ marginTop: 18, fontSize: 11, color: "#444", textAlign: "center" }}>
           Arrow keys or D-pad · {ROUND_DURATION}s per round
         </div>
+        <Footer />
       </div>
     );
   }
@@ -1580,6 +1575,7 @@ function CargoRun() {
             onMouseLeave={e => { e.currentTarget.style.color="#444";    e.currentTarget.style.borderColor="#2a2a3a"; }}
           >🕹 ARCADE</a>
         </div>
+        <Footer />
       </div>
     );
   }
@@ -1998,95 +1994,43 @@ function DpadButton({ onClick, label }) {
   );
 }
 
+// ============================================================
+// FOOTER — in-flow only, rendered as the last element of a
+// screen's own content. Never fixed/floating, never shown
+// during active gameplay. Safe to reuse on title / contract /
+// results screens.
+// ============================================================
+function Footer() {
+  return (
+    <footer id="la-footer" style={{ marginTop: 24 }}>
+      <div className="la-footer-inner">
+        <div className="la-footer-brand">
+          LOGISTICS ARCADE <span className="la-footer-copy">© 2026</span>
+        </div>
+        <div className="la-footer-meta">
+          Built by{" "}
+          <a href="https://github.com/jasperdock" target="_blank" rel="noopener" className="la-footer-link">
+            JasperDock
+          </a>
+          {" · "}
+          <span className="la-footer-version">{"Version " + LA_VERSION}</span>
+        </div>
+        <nav className="la-footer-nav">
+          <a href="index.html" className="la-footer-link">🕹 Arcade Home</a>
+          <a href="https://github.com/jasperdock/logisticsarcade" target="_blank" rel="noopener" className="la-footer-link">
+            GitHub ↗
+          </a>
+        </nav>
+      </div>
+    </footer>
+  );
+}
+
 
     // Mount
     const root = ReactDOM.createRoot(document.getElementById('root'));
     root.render(React.createElement(CargoRun));
   </script>
 
-  <!-- ============================================================
-       LOGISTICS ARCADE FOOTER
-       Version: change LA_VERSION below for all future updates
-       ============================================================ -->
-  <script>var LA_VERSION = "0.1";</script>
-  <footer id="la-footer" style="
-    position: fixed;
-    bottom: 0; left: 0; right: 0;
-    z-index: 900;
-    background: linear-gradient(0deg, #07070d 80%, transparent);
-    padding: 6px 14px 7px;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    flex-wrap: wrap;
-    gap: 4px;
-    pointer-events: none;
-    font-family: 'Courier New', Courier, monospace;
-  ">
-    <!-- LEFT: brand + version -->
-    <div style="display:flex; align-items:center; gap:10px; pointer-events:auto;">
-      <a href="index.html" style="
-        font-size: 9px; font-weight: 700; letter-spacing: 3px;
-        color: #F97316; text-decoration: none; opacity: 0.75;
-        transition: opacity 0.15s;
-      "
-        onmouseover="this.style.opacity='1'"
-        onmouseout="this.style.opacity='0.75'"
-      >LOGISTICS ARCADE</a>
-      <span style="font-size: 8px; color: #2a2a3a; letter-spacing: 1px;">·</span>
-      <span id="la-version-label" style="font-size: 8px; color: #2a2a3a; letter-spacing: 1px;"></span>
-    </div>
-
-    <!-- RIGHT: links + credit -->
-    <div style="display:flex; align-items:center; gap:12px; pointer-events:auto;">
-      <a href="index.html" style="
-        font-size: 8px; color: #333; letter-spacing: 2px;
-        text-decoration: none; transition: color 0.15s;
-      "
-        onmouseover="this.style.color='#F97316'"
-        onmouseout="this.style.color='#333'"
-      >ARCADE HOME</a>
-      <a href="https://github.com/jasperdock/logisticsarcade"
-         target="_blank" rel="noopener" style="
-        font-size: 8px; color: #333; letter-spacing: 2px;
-        text-decoration: none; transition: color 0.15s;
-      "
-        onmouseover="this.style.color='#38BDF8'"
-        onmouseout="this.style.color='#333'"
-      >GITHUB</a>
-      <span style="font-size: 8px; color: #222; letter-spacing: 1px;">Built by JasperDock</span>
-    </div>
-  </footer>
-  <script>
-    // Stamp version dynamically so a single LA_VERSION change updates all text
-    (function() {
-      var el = document.getElementById('la-version-label');
-      if (el) el.textContent = 'v' + LA_VERSION;
-    })();
-  </script>
-<!-- ============================================================
-     LOGISTICS ARCADE FOOTER — v0.1
-     To update version: change LA_VERSION below
-     ============================================================ -->
-<footer id="la-footer">
-  <div class="la-footer-inner">
-    <div class="la-footer-brand">
-      LOGISTICS ARCADE <span class="la-footer-copy">© 2026</span>
-    </div>
-    <div class="la-footer-meta">
-      Built by <a href="https://github.com/jasperdock" target="_blank" rel="noopener" class="la-footer-link">JasperDock</a>
-      &nbsp;·&nbsp;
-      <span class="la-footer-version" id="la-version-label">Version 0.1</span>
-    </div>
-    <nav class="la-footer-nav">
-      <a href="index.html" class="la-footer-link">🕹 Arcade Home</a>
-      <a href="https://github.com/jasperdock/logisticsarcade" target="_blank" rel="noopener" class="la-footer-link">GitHub ↗</a>
-    </nav>
-  </div>
-</footer>
-<script>
-  // LA_VERSION is declared once above (var LA_VERSION = "0.1") — reuse it here
-  document.getElementById("la-version-label").textContent = "Version " + LA_VERSION;
-</script>
 </body>
 </html>

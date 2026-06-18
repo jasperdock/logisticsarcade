@@ -160,63 +160,75 @@
   #homeBtn:hover { background:rgba(92,200,255,.15); color:#fff; }
   #homeBtn:active { background:rgba(92,200,255,.25); }
 
-  /* ── Logistics Arcade Footer ── */
-  #arcadeFooter {
-    position: absolute;
-    bottom: 0; left: 0; right: 0;
-    z-index: 4;
-    pointer-events: none;
+  /* ── Logistics Arcade Footer ──
+     Lives INSIDE the menu screens only (start + how-to-play),
+     never during active gameplay, so it can never overlap
+     crane controls or HUD elements. */
+  .arcade-footer {
+    width: 100%;
+    max-width: 300px;
+    margin-top: 1.1rem;
+    padding-top: .7rem;
+    border-top: 1px solid rgba(255,255,255,0.06);
     display: flex;
-    justify-content: center;
-    align-items: flex-end;
-    padding: 0 0 .35rem;
+    flex-direction: column;
+    align-items: center;
+    gap: .25rem;
+    flex-shrink: 0;
   }
-  .footer-inner {
+  .footer-brand {
+    font-size: .56rem;
+    font-weight: 700;
+    color: rgba(92,200,255,0.6);
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    text-align: center;
+  }
+  .footer-tagline {
+    font-size: .5rem;
+    color: rgba(255,255,255,0.32);
+    letter-spacing: .4px;
+    text-align: center;
+    font-style: italic;
+  }
+  .footer-meta-row {
     display: flex;
     flex-wrap: wrap;
     justify-content: center;
     align-items: center;
-    gap: .3rem .7rem;
-    pointer-events: auto;
-    padding: .22rem .65rem;
-    background: rgba(3,6,14,0.55);
-    border: 1px solid rgba(255,255,255,0.055);
-    border-radius: 20px;
-    backdrop-filter: blur(6px);
-    -webkit-backdrop-filter: blur(6px);
-  }
-  .footer-brand {
-    font-size: .48rem;
-    font-weight: 700;
-    color: rgba(92,200,255,0.65);
-    letter-spacing: 1.5px;
-    text-transform: uppercase;
-    white-space: nowrap;
+    gap: .3rem .55rem;
+    margin-top: .15rem;
   }
   .footer-sep {
-    font-size: .42rem;
+    font-size: .46rem;
     color: rgba(255,255,255,0.15);
   }
   .footer-link {
-    font-size: .46rem;
+    font-size: .5rem;
     font-weight: 600;
-    color: rgba(255,255,255,0.38);
+    color: rgba(255,255,255,0.42);
     text-decoration: none;
-    letter-spacing: .8px;
+    letter-spacing: .6px;
     text-transform: uppercase;
     transition: color .15s;
     white-space: nowrap;
   }
-  .footer-link:hover { color: rgba(255,180,80,0.85); }
+  .footer-link:hover, .footer-link:active { color: rgba(255,180,80,0.85); }
   .footer-version {
-    font-size: .42rem;
-    color: rgba(255,255,255,0.22);
-    letter-spacing: .8px;
+    font-size: .46rem;
+    color: rgba(255,255,255,0.26);
+    letter-spacing: .4px;
     white-space: nowrap;
     font-variant-numeric: tabular-nums;
   }
-  /* Hide footer when mobile controls are visible so it doesn't overlap */
-  @media (pointer:coarse) { #arcadeFooter { display:none; } }
+  /* Menu screens scroll vertically if content + footer exceed viewport height,
+     so the footer is always reachable without ever displacing gameplay controls. */
+  #startScreen, #howToScreen {
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    padding-top: 1.5rem;
+    padding-bottom: 1.5rem;
+  }
 </style>
 </head>
 <body>
@@ -282,6 +294,20 @@
     <button class="btn btn-secondary" id="howToBtn" style="margin-bottom:.5rem">HOW TO PLAY</button>
     <button class="btn btn-secondary" id="resetBestBtn">Reset Revenue Records</button>
     <a class="btn btn-secondary" href="index.html" style="margin-top:.5rem;text-align:center;text-decoration:none;display:inline-block">&#8592; Arcade Home</a>
+    <div class="arcade-footer">
+      <span class="footer-brand">Logistics Arcade &copy; 2026</span>
+      <span class="footer-tagline">Operational Chaos Presented as Arcade Gameplay</span>
+      <div class="footer-meta-row">
+        <span class="footer-version">Built by JasperDock</span>
+        <span class="footer-sep">|</span>
+        <span class="footer-version arcade-version-text">Version 0.1.1</span>
+      </div>
+      <div class="footer-meta-row">
+        <a class="footer-link" href="index.html">Arcade Home</a>
+        <span class="footer-sep">&middot;</span>
+        <a class="footer-link" href="https://github.com/jasperdock/logisticsarcade" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </div>
   </div>
 
   <!-- How To Play screen -->
@@ -327,6 +353,20 @@
 
     <button class="btn" id="htpStartBtn">START OPERATIONS</button>
     <button class="btn btn-secondary" id="htpBackBtn" style="margin-top:.5rem">← Back</button>
+    <div class="arcade-footer">
+      <span class="footer-brand">Logistics Arcade &copy; 2026</span>
+      <span class="footer-tagline">Operational Chaos Presented as Arcade Gameplay</span>
+      <div class="footer-meta-row">
+        <span class="footer-version">Built by JasperDock</span>
+        <span class="footer-sep">|</span>
+        <span class="footer-version arcade-version-text">Version 0.1.1</span>
+      </div>
+      <div class="footer-meta-row">
+        <a class="footer-link" href="index.html">Arcade Home</a>
+        <span class="footer-sep">&middot;</span>
+        <a class="footer-link" href="https://github.com/jasperdock/logisticsarcade" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </div>
   </div>
 
   <div class="screen hidden" id="gameOverScreen">
@@ -379,25 +419,13 @@
     </div>
   </div>
 
-  <!-- Logistics Arcade footer -->
-  <div id="arcadeFooter">
-    <div class="footer-inner">
-      <span class="footer-brand">Logistics Arcade &copy; 2026</span>
-      <span class="footer-sep">&middot;</span>
-      <a class="footer-link" href="index.html">Arcade Home</a>
-      <span class="footer-sep">&middot;</span>
-      <a class="footer-link" href="https://github.com/jasperdock/logisticsarcade" target="_blank" rel="noopener">GitHub</a>
-      <span class="footer-sep">&middot;</span>
-      <span class="footer-version" id="arcadeVersion">v0.1</span>
-    </div>
-  </div>
 </div>
 
 <script>
 // ============================================================
 //  CONTAINER STACKER
 // ============================================================
-const ARCADE_VERSION = '0.1'; // bump this for each release
+const ARCADE_VERSION = '0.1.1'; // bump this for each release
 
 
 const canvas  = document.getElementById('gameCanvas');
@@ -1973,7 +2001,7 @@ window.addEventListener('resize',resize);
 resize();
 initBackground();
 renderChallengePanel();
-(function(){ const v=document.getElementById('arcadeVersion'); if(v) v.textContent='v'+ARCADE_VERSION; })();
+(function(){ document.querySelectorAll('.arcade-version-text').forEach(v => v.textContent = 'Version ' + ARCADE_VERSION); })();
 crane.x=canvas.width*.72;crane.y=canvas.height*CRANE_Y_RATIO;crane.armRight=canvas.width*.88;
 idleLoop();
 </script>
