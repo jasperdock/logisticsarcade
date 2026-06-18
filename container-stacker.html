@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
 <title>Container Stacker</title>
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -159,6 +159,64 @@
   #homeBtn { position:absolute; top:.55rem; left:.55rem; z-index:6; background:rgba(0,0,0,.45); border:1px solid rgba(255,255,255,.12); border-radius:8px; color:rgba(255,255,255,.65); font-size:.6rem; font-weight:700; letter-spacing:.5px; text-transform:uppercase; text-decoration:none; padding:0 .55rem; height:30px; display:flex; align-items:center; gap:.25rem; white-space:nowrap; transition:background .1s, color .1s; touch-action:manipulation; }
   #homeBtn:hover { background:rgba(92,200,255,.15); color:#fff; }
   #homeBtn:active { background:rgba(92,200,255,.25); }
+
+  /* ── Logistics Arcade Footer ── */
+  #arcadeFooter {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    z-index: 4;
+    pointer-events: none;
+    display: flex;
+    justify-content: center;
+    align-items: flex-end;
+    padding: 0 0 .35rem;
+  }
+  .footer-inner {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    align-items: center;
+    gap: .3rem .7rem;
+    pointer-events: auto;
+    padding: .22rem .65rem;
+    background: rgba(3,6,14,0.55);
+    border: 1px solid rgba(255,255,255,0.055);
+    border-radius: 20px;
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+  }
+  .footer-brand {
+    font-size: .48rem;
+    font-weight: 700;
+    color: rgba(92,200,255,0.65);
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .footer-sep {
+    font-size: .42rem;
+    color: rgba(255,255,255,0.15);
+  }
+  .footer-link {
+    font-size: .46rem;
+    font-weight: 600;
+    color: rgba(255,255,255,0.38);
+    text-decoration: none;
+    letter-spacing: .8px;
+    text-transform: uppercase;
+    transition: color .15s;
+    white-space: nowrap;
+  }
+  .footer-link:hover { color: rgba(255,180,80,0.85); }
+  .footer-version {
+    font-size: .42rem;
+    color: rgba(255,255,255,0.22);
+    letter-spacing: .8px;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  /* Hide footer when mobile controls are visible so it doesn't overlap */
+  @media (pointer:coarse) { #arcadeFooter { display:none; } }
 </style>
 </head>
 <body>
@@ -320,12 +378,27 @@
       </div>
     </div>
   </div>
+
+  <!-- Logistics Arcade footer -->
+  <div id="arcadeFooter">
+    <div class="footer-inner">
+      <span class="footer-brand">Logistics Arcade &copy; 2026</span>
+      <span class="footer-sep">&middot;</span>
+      <a class="footer-link" href="index.html">Arcade Home</a>
+      <span class="footer-sep">&middot;</span>
+      <a class="footer-link" href="https://github.com/jasperdock/logisticsarcade" target="_blank" rel="noopener">GitHub</a>
+      <span class="footer-sep">&middot;</span>
+      <span class="footer-version" id="arcadeVersion">v0.1</span>
+    </div>
+  </div>
 </div>
 
 <script>
 // ============================================================
 //  CONTAINER STACKER
 // ============================================================
+const ARCADE_VERSION = '0.1'; // bump this for each release
+
 
 const canvas  = document.getElementById('gameCanvas');
 const ctx     = canvas.getContext('2d');
@@ -1900,6 +1973,7 @@ window.addEventListener('resize',resize);
 resize();
 initBackground();
 renderChallengePanel();
+(function(){ const v=document.getElementById('arcadeVersion'); if(v) v.textContent='v'+ARCADE_VERSION; })();
 crane.x=canvas.width*.72;crane.y=canvas.height*CRANE_Y_RATIO;crane.armRight=canvas.width*.88;
 idleLoop();
 </script>

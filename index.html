@@ -548,6 +548,72 @@
       font-style: italic;
     }
 
+    .footer-divider {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 24px 0;
+    }
+
+    .footer-bottom {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      align-items: flex-start;
+    }
+
+    @media (min-width: 640px) {
+      .footer-bottom {
+        flex-direction: row;
+        justify-content: space-between;
+        align-items: center;
+      }
+    }
+
+    .footer-line {
+      font-size: 12.5px;
+      color: var(--muted);
+      line-height: 1.6;
+    }
+
+    .footer-line strong {
+      color: var(--body);
+      font-weight: 600;
+    }
+
+    .footer-version {
+      font-family: var(--font-display);
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      color: var(--amber-dim);
+    }
+
+    .footer-links {
+      display: flex;
+      gap: 16px;
+    }
+
+    .footer-link {
+      font-family: var(--font-display);
+      font-size: 12px;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #6fa8dc;
+      text-decoration: none;
+      border: 1px solid rgba(111, 168, 220, 0.3);
+      border-radius: 4px;
+      padding: 6px 14px;
+      transition: background 0.15s, color 0.15s, border-color 0.15s;
+      white-space: nowrap;
+    }
+
+    .footer-link:hover {
+      background: rgba(111, 168, 220, 0.12);
+      color: #9cc3eb;
+      border-color: rgba(111, 168, 220, 0.5);
+    }
+
     /* ── Reduced motion ──────────────────────────────────── */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { transition: none !important; }
@@ -737,6 +803,19 @@
         <div class="footer-meta">
           <span class="footer-build">Alpha Build</span>
           <span class="footer-tagline">Freight or consequences.</span>
+        </div>
+      </div>
+
+      <hr class="footer-divider">
+
+      <div class="footer-bottom">
+        <div class="footer-line">
+          <strong>LOGISTICS ARCADE © 2026</strong><br>
+          Operational Chaos Presented as Arcade Gameplay<br>
+          Built by JasperDock | <span class="footer-version">Version 0.1.1</span>
+        </div>
+        <div class="footer-links">
+          <a class="footer-link" href="https://github.com/jasperdock/logisticsarcade" target="_blank" rel="noopener noreferrer">GitHub</a>
         </div>
       </div>
     </div>

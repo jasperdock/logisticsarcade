@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>Fixed Controls + Scrollable Game Area — Pattern</title>
+<!--
+  ╔══════════════════════════════════════════════════════════════╗
+  ║  LOGISTICS ARCADE — FIXED CONTROLS LAYOUT PATTERN           ║
+  ║                                                              ║
+  ║  TARGET FILES:                                               ║
+  ║    container-stuffer.html  ← PRIMARY target                 ║
+  ║    cargo-run.html          ← may need similar treatment      ║
+  ║                                                              ║
+  ║  PRINCIPLE:                                                  ║
+  ║    Game area  → scrollable                                   ║
+  ║    Controls   → fixed to bottom, never scroll off-screen     ║
+  ╚══════════════════════════════════════════════════════════════╝
+-->
+<style>
+
+/* ── 1. Root layout ─────────────────────────────────────────── */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html, body {
+  width: 100%;
+  height: 100%;           /* full viewport height */
+  overflow: hidden;       /* body itself never scrolls */
+  background: #0a0e1a;
+  font-family: 'Segoe UI', system-ui, sans-serif;
+  touch-action: pan-y;    /* allow vertical panning in game area only */
+}
+
+/* ── 2. Outer shell: full-screen flex column ─────────────────── */
+
+#appShell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;           /* fills the entire viewport */
+  max-width: 480px;       /* clamp to mobile-game width */
+  margin: 0 auto;
+  position: relative;
+  overflow: hidden;       /* clip children */
+}
+
+/* ── 3. Scrollable game area ─────────────────────────────────── */
+
+#gameArea {
+  flex: 1 1 0;            /* take all space above the controls */
+  min-height: 0;          /* critical: allows flex child to shrink below content size */
+  overflow-y: auto;       /* vertical scroll when content is taller than available space */
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;   /* smooth momentum scroll on iOS */
+  overscroll-behavior: contain;        /* prevent scroll chaining to body */
+  padding-bottom: .5rem;
+}
+
+/* ── 4. Fixed control bar ────────────────────────────────────── */
+/*
+   Using flex layout (not position:fixed) keeps the bar inside
+   the 480px max-width column and avoids iOS safe-area edge cases.
+   It stays at the bottom because flex-direction:column pushes it there.
+*/
+
+#controlBar {
+  flex: 0 0 auto;                      /* never shrink or grow */
+  width: 100%;
+  background: rgba(5, 10, 25, 0.92);
+  border-top: 1px solid rgba(255,255,255,0.08);
+  padding: .6rem .6rem env(safe-area-inset-bottom, 0px); /* iOS home bar */
+  /* Fallback for older browsers: */
+  padding-bottom: max(.6rem, env(safe-area-inset-bottom, .6rem));
+  z-index: 20;
+  touch-action: none;                  /* controls consume touch, don't scroll */
+}
+
+/* ── 5. Control bar contents ─────────────────────────────────── */
+
+.ctrl-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: .4rem;
+}
+
+.ctrl-dpad {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-template-rows:    repeat(3, 1fr);
+  gap: 3px;
+  width: 120px;
+  height: 120px;
+}
+
+.ctrl-btn {
+  background: rgba(255,255,255,.08);
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 1.1rem;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  user-select: none;
+  touch-action: manipulation;
+  transition: background .08s;
+}
+.ctrl-btn:active, .ctrl-btn.pressed {
+  background: rgba(92,200,255,.25);
+  border-color: rgba(92,200,255,.4);
+}
+.ctrl-btn.up    { grid-column:2; grid-row:1; }
+.ctrl-btn.left  { grid-column:1; grid-row:2; }
+.ctrl-btn.right { grid-column:3; grid-row:2; }
+.ctrl-btn.down  { grid-column:2; grid-row:3; }
+
+.ctrl-drop {
+  width: 100px; height: 100px;
+  border-radius: 50%;
+  background: rgba(92,200,255,.12);
+  border: 2px solid rgba(92,200,255,.3);
+  font-size: .7rem; font-weight: 700;
+  letter-spacing: 1px; text-transform: uppercase;
+  color: #5cc8ff; flex-shrink: 0;
+  touch-action: manipulation;
+}
+.ctrl-drop:active { background: rgba(92,200,255,.3); }
+
+/* ── 6. HUD / header (fixed inside appShell, not scrollable) ─── */
+
+#hud {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: space-between;
+  padding: .5rem .8rem;
+  background: rgba(0,0,0,.3);
+  border-bottom: 1px solid rgba(255,255,255,.05);
+  z-index: 10;
+}
+
+/* ── 7. Safe area for devices with notches / home indicators ─── */
+/*
+   On modern iPhones the home bar sits below the viewport.
+   env(safe-area-inset-bottom) gives the exact pixel offset.
+   Already applied to #controlBar padding above.
+*/
+
+/* ── DEMO STYLES (remove in production) ─────────────────────── */
+body { color: #fff; }
+.demo-container {
+  width: 90%; margin: 1rem auto;
+  background: rgba(255,255,255,.05);
+  border: 1px dashed rgba(92,200,255,.3);
+  border-radius: 10px; padding: 1rem;
+  min-height: 800px;    /* simulate tall container */
+  display: flex; align-items: flex-start; justify-content: center;
+  padding-top: 2rem;
+  font-size: .9rem; color: rgba(255,255,255,.4);
+}
+
+</style>
+</head>
+<body>
+
+<!--
+  ═══ STRUCTURE TO APPLY IN CONTAINER STUFFER ═════════════════
+
+  Replace the current top-level layout with this shell.
+  The key insight: flex-column with gameArea flex:1 + controlBar flex:0
+  means the control bar is always visible and the game area scrolls.
+-->
+
+<div id="appShell">
+
+  <!-- HUD stays above game area, never scrolls -->
+  <div id="hud">
+    <div style="font-size:.65rem;opacity:.6">SCORE</div>
+    <div style="font-size:.65rem;opacity:.6">STACKED</div>
+    <div style="font-size:.65rem;opacity:.6">HEIGHT</div>
+  </div>
+
+  <!-- Scrollable game area — grows taller than viewport freely -->
+  <div id="gameArea">
+    <div class="demo-container">
+      Game canvas / DOM content goes here.<br><br>
+      This area scrolls when content is taller than the space
+      between the HUD and the control bar.<br><br>
+      The control bar below NEVER scrolls off screen.
+    </div>
+  </div>
+
+  <!-- Control bar — fixed to bottom inside appShell -->
+  <div id="controlBar">
+    <div class="ctrl-row">
+      <div class="ctrl-dpad">
+        <div class="ctrl-btn up">▲</div>
+        <div class="ctrl-btn left">◀</div>
+        <div class="ctrl-btn right">▶</div>
+        <div class="ctrl-btn down">▼</div>
+      </div>
+      <div class="ctrl-btn ctrl-drop">DROP</div>
+    </div>
+  </div>
+
+</div>
+
+<!--
+  ═══ IMPLEMENTATION NOTES ════════════════════════════════════
+
+  container-stuffer.html — apply this pattern:
+  ─────────────────────────────────────────────
+  1. Wrap entire page in <div id="appShell">
+  2. Move the container / cargo drawing area into <div id="gameArea">
+  3. Move all control buttons into <div id="controlBar">
+  4. Any fixed HUD (score, weight, etc.) goes above gameArea
+
+  cargo-run.html — canvas-based game:
+  ─────────────────────────────────────
+  The canvas is fixed-size so scrolling isn't needed.
+  Use position:fixed or position:absolute for controls.
+  The flex shell pattern still works as a safe wrapper.
+
+  container-stacker.html — already handled:
+  ──────────────────────────────────────────
+  Uses a full-screen canvas + position:absolute controls.
+  Controls cannot scroll off screen. No change needed.
+
+  ═══ VIEWPORT META ═══════════════════════════════════════════
+
+  Ensure every game file has:
+
+  <meta name="viewport" content="width=device-width,
+        initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+
+  viewport-fit=cover is required for iOS safe area insets.
+
+  ═══ iOS SAFE AREA ═══════════════════════════════════════════
+
+  The control bar padding uses:
+    padding-bottom: env(safe-area-inset-bottom, .6rem)
+
+  This adds space for the iPhone home indicator.
+  On devices without one it falls back to .6rem.
+  Requires viewport-fit=cover in the meta tag above.
+
+-->
+
+</body>
+</html>
