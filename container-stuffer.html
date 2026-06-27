@@ -1625,20 +1625,23 @@
 // supportMin: 0.0–1.0 = fraction of base width that must be supported (default 0.7)
 // dgClass: null = normal cargo | 'flammable' | 'corrosive' | 'oxidiser'
 // DG cargo with incompatible dgClass neighbours gets a separation penalty.
+// cargoWeight:    numeric weight of this item (1–6 scale)
+// cargoSupports:  max total weight this item can bear stacked on top of it
+// Weight scale:  1=very light parcel, 2=box, 3=drum, 4=crate, 5=machinery, 6=project
 const CARGO_TYPES = [
-  { id:'pallet',    label:'Pallet',    icon:'📦', w:2, h:2, weight:3,  value:800,  color:'#4a7a3a', stroke:'#6aaa4a', fragile:false, rollable:false, heavy:false, hazmat:false, dgClass:null,        weightClass:'M', prefersFloor:false, prefersTop:false, supportMin:0.7 },
-  { id:'crate',     label:'Crate',     icon:'🗃️', w:3, h:2, weight:4,  value:1200, color:'#6a5020', stroke:'#9a7830', fragile:false, rollable:false, heavy:false, hazmat:false, dgClass:null,        weightClass:'M', prefersFloor:false, prefersTop:false, supportMin:0.7 },
-  { id:'barrel',    label:'Drum',      icon:'🛢️', w:1, h:2, weight:2,  value:600,  color:'#3a3a5a', stroke:'#5a5a9a', fragile:false, rollable:true,  heavy:false, hazmat:false, dgClass:null,        weightClass:'M', prefersFloor:true,  prefersTop:false, supportMin:1.0 },
-  { id:'pipe',      label:'Pipe',      icon:'⬜', w:4, h:1, weight:5,  value:1400, color:'#5a4a2a', stroke:'#8a7040', fragile:false, rollable:true,  heavy:false, hazmat:false, dgClass:null,        weightClass:'M', prefersFloor:false, prefersTop:false, supportMin:0.7 },
-  { id:'fragile',   label:'Fragile',   icon:'🔮', w:2, h:2, weight:1,  value:2000, color:'#3a2a5a', stroke:'#7a5aaa', fragile:true,  rollable:false, heavy:false, hazmat:false, dgClass:null,        weightClass:'L', prefersFloor:false, prefersTop:true,  supportMin:0.5 },
-  { id:'machinery', label:'Machinery', icon:'⚙️', w:3, h:3, weight:8,  value:3500, color:'#3a2a1a', stroke:'#6a4a2a', fragile:false, rollable:false, heavy:true,  hazmat:false, dgClass:null,        weightClass:'H', prefersFloor:true,  prefersTop:false, supportMin:0.8 },
-  { id:'hazmat',    label:'Hazmat',    icon:'☢️', w:2, h:2, weight:3,  value:2500, color:'#4a3a0a', stroke:'#9a7a10', fragile:false, rollable:false, heavy:false, hazmat:true,  dgClass:'oxidiser',  weightClass:'M', prefersFloor:false, prefersTop:false, supportMin:0.7 },
-  { id:'bigbox',    label:'Big Box',   icon:'📫', w:4, h:3, weight:6,  value:2800, color:'#1a3a4a', stroke:'#2a6a7a', fragile:false, rollable:false, heavy:true,  hazmat:false, dgClass:null,        weightClass:'H', prefersFloor:true,  prefersTop:false, supportMin:0.8 },
-  { id:'smallbox',  label:'Box',       icon:'📫', w:1, h:1, weight:1,  value:400,  color:'#2a4a2a', stroke:'#4a7a4a', fragile:false, rollable:false, heavy:false, hazmat:false, dgClass:null,        weightClass:'L', prefersFloor:false, prefersTop:false, supportMin:0.5 },
-  { id:'oversized', label:'Oversized', icon:'🏗️', w:5, h:2, weight:10, value:4000, color:'#3a1a1a', stroke:'#7a2a2a', fragile:false, rollable:false, heavy:true,  hazmat:false, dgClass:null,        weightClass:'H', prefersFloor:true,  prefersTop:false, supportMin:0.8 },
-  // ── DG cargo types ──────────────────────────────────────────────────────────
-  { id:'flammable', label:'Flammable', icon:'🔥', w:2, h:2, weight:2,  value:2200, color:'#4a1a08', stroke:'#c04010', fragile:false, rollable:false, heavy:false, hazmat:true,  dgClass:'flammable', weightClass:'M', prefersFloor:false, prefersTop:false, supportMin:0.7 },
-  { id:'corrosive', label:'Corrosive', icon:'⚗️', w:2, h:2, weight:2,  value:2000, color:'#0a3a10', stroke:'#10aa30', fragile:false, rollable:false, heavy:false, hazmat:true,  dgClass:'corrosive', weightClass:'M', prefersFloor:false, prefersTop:false, supportMin:0.7 },
+  { id:'pallet',    label:'Pallet',    icon:'📦', w:2, h:2, weight:3,  value:800,  color:'#4a7a3a', stroke:'#6aaa4a', fragile:false, rollable:false, heavy:false, hazmat:false, dgClass:null,        weightClass:'M', prefersFloor:false, prefersTop:false, supportMin:0.7, cargoWeight:3, cargoSupports:5 },
+  { id:'crate',     label:'Crate',     icon:'🗃️', w:3, h:2, weight:4,  value:1200, color:'#6a5020', stroke:'#9a7830', fragile:false, rollable:false, heavy:false, hazmat:false, dgClass:null,        weightClass:'M', prefersFloor:false, prefersTop:false, supportMin:0.7, cargoWeight:4, cargoSupports:6 },
+  { id:'barrel',    label:'Drum',      icon:'🛢️', w:1, h:2, weight:2,  value:600,  color:'#3a3a5a', stroke:'#5a5a9a', fragile:false, rollable:true,  heavy:false, hazmat:false, dgClass:null,        weightClass:'M', prefersFloor:true,  prefersTop:false, supportMin:1.0, cargoWeight:3, cargoSupports:3 },
+  { id:'pipe',      label:'Pipe',      icon:'⬜', w:4, h:1, weight:5,  value:1400, color:'#5a4a2a', stroke:'#8a7040', fragile:false, rollable:true,  heavy:false, hazmat:false, dgClass:null,        weightClass:'M', prefersFloor:false, prefersTop:false, supportMin:0.7, cargoWeight:4, cargoSupports:4 },
+  { id:'fragile',   label:'Fragile',   icon:'🔮', w:2, h:2, weight:1,  value:2000, color:'#3a2a5a', stroke:'#7a5aaa', fragile:true,  rollable:false, heavy:false, hazmat:false, dgClass:null,        weightClass:'L', prefersFloor:false, prefersTop:true,  supportMin:0.5, cargoWeight:1, cargoSupports:1 },
+  { id:'machinery', label:'Machinery', icon:'⚙️', w:3, h:3, weight:8,  value:3500, color:'#3a2a1a', stroke:'#6a4a2a', fragile:false, rollable:false, heavy:true,  hazmat:false, dgClass:null,        weightClass:'H', prefersFloor:true,  prefersTop:false, supportMin:0.8, cargoWeight:5, cargoSupports:8 },
+  { id:'hazmat',    label:'Hazmat',    icon:'☢️', w:2, h:2, weight:3,  value:2500, color:'#4a3a0a', stroke:'#9a7a10', fragile:false, rollable:false, heavy:false, hazmat:true,  dgClass:'oxidiser',  weightClass:'M', prefersFloor:false, prefersTop:false, supportMin:0.7, cargoWeight:3, cargoSupports:4 },
+  { id:'bigbox',    label:'Big Box',   icon:'📫', w:4, h:3, weight:6,  value:2800, color:'#1a3a4a', stroke:'#2a6a7a', fragile:false, rollable:false, heavy:true,  hazmat:false, dgClass:null,        weightClass:'H', prefersFloor:true,  prefersTop:false, supportMin:0.8, cargoWeight:5, cargoSupports:7 },
+  { id:'smallbox',  label:'Box',       icon:'📫', w:1, h:1, weight:1,  value:400,  color:'#2a4a2a', stroke:'#4a7a4a', fragile:false, rollable:false, heavy:false, hazmat:false, dgClass:null,        weightClass:'L', prefersFloor:false, prefersTop:false, supportMin:0.5, cargoWeight:1, cargoSupports:2 },
+  { id:'oversized', label:'Oversized', icon:'🏗️', w:5, h:2, weight:10, value:4000, color:'#3a1a1a', stroke:'#7a2a2a', fragile:false, rollable:false, heavy:true,  hazmat:false, dgClass:null,        weightClass:'H', prefersFloor:true,  prefersTop:false, supportMin:0.8, cargoWeight:6, cargoSupports:10},
+  // ── DG cargo types ──
+  { id:'flammable', label:'Flammable', icon:'🔥', w:2, h:2, weight:2,  value:2200, color:'#4a1a08', stroke:'#c04010', fragile:false, rollable:false, heavy:false, hazmat:true,  dgClass:'flammable', weightClass:'M', prefersFloor:false, prefersTop:false, supportMin:0.7, cargoWeight:2, cargoSupports:3 },
+  { id:'corrosive', label:'Corrosive', icon:'⚗️', w:2, h:2, weight:2,  value:2000, color:'#0a3a10', stroke:'#10aa30', fragile:false, rollable:false, heavy:false, hazmat:true,  dgClass:'corrosive', weightClass:'M', prefersFloor:false, prefersTop:false, supportMin:0.7, cargoWeight:2, cargoSupports:3 },
 ];
 
 // DG incompatibility pairs — if both appear adjacent, a separation risk fires.
@@ -1859,11 +1862,11 @@ const GRADE_DATA = {
 };
 
 function computeGrade(net, spacePct, crushLoss, floatLoss, drumLoss,
-    unloadedCount, delayCost, reworkLoss, dgLoss) {
+    unloadedCount, delayCost, reworkLoss, dgLoss, overloadLoss) {
   let score = 0;
   score += Math.min(35, Math.round((net / 8000) * 35));
   score += Math.round(spacePct * 20);
-  const damageLoss = (crushLoss || 0) + (floatLoss || 0) + (drumLoss || 0) + (dgLoss || 0);
+  const damageLoss = (crushLoss||0) + (floatLoss||0) + (drumLoss||0) + (dgLoss||0) + (overloadLoss||0);
   score += Math.max(0, 20 - Math.round((damageLoss / 3000) * 20));
   score += unloadedCount === 0 ? 15 : Math.max(0, 15 - unloadedCount * 4);
   score += delayCost === 0 ? 10 : Math.max(0, 10 - Math.round((delayCost / 3000) * 10));
@@ -1973,7 +1976,7 @@ function analyseLoad() {
   const issues = {};
   state.cargo.forEach(cargo => {
     if (!state.placedCargo.has(cargo.uid)) return;
-    issues[cargo.uid] = { unsupported:false, crushed:false, unstableDrum:false, topHeavy:false, supportPct:1, dgConflict:false };
+    issues[cargo.uid] = { unsupported:false, crushed:false, unstableDrum:false, topHeavy:false, supportPct:1, dgConflict:false, overloaded:false };
   });
 
   state.cargo.forEach(cargo => {
@@ -2078,6 +2081,49 @@ function analyseLoad() {
         }
       }
     }
+    // ── WEIGHT OVERLOAD CHECK ──────────────────────────────────────
+    // If cargo is sitting directly on top of another item, check that
+    // the item below can support this item's cargoWeight.
+    // We check each cell of the bottom edge and the item directly below it.
+    if (bottomRow < state.ROWS) {
+      const myWeight = cargo.cargoWeight || 0;
+      // Collect unique UIDs directly below this item's bottom edge
+      const belowUids = new Set();
+      for (let c = leftCol; c < leftCol + cw; c++) {
+        const bUid = state.grid[bottomRow]?.[c];
+        if (bUid && bUid !== cargo.uid) belowUids.add(bUid);
+      }
+      belowUids.forEach(bUid => {
+        const below = state.cargo.find(x => x.uid === bUid);
+        if (!below) return;
+        const supports = below.cargoSupports ?? 99;
+        if (myWeight > supports) {
+          // This item is too heavy for what's supporting it
+          issues[cargo.uid].overloaded = true;
+          // Also flag the supporting item as overloaded (it's being crushed)
+          if (issues[bUid]) issues[bUid].overloaded = true;
+        }
+      });
+    }
+
+    // ── TOP-HEAVY CHECK ────────────────────────────────────────────
+    // Flag if a heavy item (H class) is placed above a light item (L class).
+    // This detects the "machinery on small boxes" scenario.
+    if (cargo.weightClass === 'H') {
+      for (let c = leftCol; c < leftCol + cw; c++) {
+        for (let br = topRow + ch; br < state.ROWS; br++) {
+          const bUid = state.grid[br]?.[c];
+          if (bUid && bUid !== cargo.uid) {
+            const below = state.cargo.find(x => x.uid === bUid);
+            if (below && below.weightClass === 'L') {
+              issues[cargo.uid].topHeavy = true;
+              break;
+            }
+          }
+        }
+        if (issues[cargo.uid].topHeavy) break;
+      }
+    }
   });
 
   return issues;
@@ -2086,19 +2132,23 @@ function analyseLoad() {
 // Returns array of human-readable issue strings for the risk modal
 function buildRiskReport(issueMap) {
   const problems = [];
-  let floatingCount = 0, crushedCount = 0, drumCount = 0, dgCount = 0;
+  let floatingCount = 0, crushedCount = 0, drumCount = 0, dgCount = 0, overloadCount = 0, topHeavyCount = 0;
   Object.entries(issueMap).forEach(([uid, iss]) => {
     const cargo = state.cargo.find(c => c.uid === uid);
     if (!cargo) return;
-    if (iss.unsupported) floatingCount++;
-    if (iss.crushed) crushedCount++;
+    if (iss.unsupported)  floatingCount++;
+    if (iss.crushed)      crushedCount++;
     if (iss.unstableDrum) drumCount++;
-    if (iss.dgConflict) dgCount++;
+    if (iss.dgConflict)   dgCount++;
+    if (iss.overloaded)   overloadCount++;
+    if (iss.topHeavy)     topHeavyCount++;
   });
-  if (floatingCount > 0) problems.push({ text: `${floatingCount} cargo item${floatingCount>1?'s':''} unsupported / floating`, icon:'🟥', critical: true });
-  if (crushedCount > 0) problems.push({ text: `${crushedCount} fragile item${crushedCount>1?'s':''} at crush risk`, icon:'💥', critical: true });
-  if (drumCount > 0) problems.push({ text: `${drumCount} drum${drumCount>1?'s':''} unstable — may roll`, icon:'⚠️', critical: false });
-  if (dgCount > 0) problems.push({ text: `DG separation risk — incompatible cargo too close`, icon:'🔶', critical: false });
+  if (floatingCount > 0)  problems.push({ text: `${floatingCount} cargo item${floatingCount>1?'s':''} unsupported / floating`, icon:'🟥', critical: true });
+  if (crushedCount > 0)   problems.push({ text: `${crushedCount} fragile item${crushedCount>1?'s':''} at crush risk`, icon:'💥', critical: true });
+  if (overloadCount > 0)  problems.push({ text: `Weight overload — support capacity exceeded`, icon:'⚖️', critical: true });
+  if (topHeavyCount > 0)  problems.push({ text: `Top-heavy loading — heavy cargo over light cargo`, icon:'📐', critical: false });
+  if (drumCount > 0)      problems.push({ text: `${drumCount} drum${drumCount>1?'s':''} unstable — may roll`, icon:'⚠️', critical: false });
+  if (dgCount > 0)        problems.push({ text: `DG separation risk — incompatible cargo too close`, icon:'🔶', critical: false });
   return problems;
 }
 
@@ -2456,6 +2506,24 @@ function generateCargo() {
       return null;
     }
 
+    // Check that items directly below slot can support this cargo's weight.
+    // Items on the floor (row === ROWS - h) are always valid — container floor is infinite support.
+    function weightSafe(col, row, w, h, cargo) {
+      const myWeight = cargo.cargoWeight || 0;
+      const bottomRow = row + h;
+      if (bottomRow >= ROWS) return true; // on the floor — always valid
+      // Check every cell of the bottom edge
+      const checked = new Set();
+      for (let c = col; c < col + w; c++) {
+        const bUid = grid[bottomRow]?.[c];
+        if (!bUid || checked.has(bUid)) continue;
+        checked.add(bUid);
+        const below = cargoList.find(x => x.uid === bUid);
+        if (below && (below.cargoSupports ?? 99) < myWeight) return false;
+      }
+      return true;
+    }
+
     let usedCells = 0;
     const ordered = packOrder(cargoList);
     for (const cargo of ordered) {
@@ -2466,14 +2534,33 @@ function generateCargo() {
       let placed_ = false;
       for (const v of variants) {
         const slot = findSlot(v.w, v.h, cargo);
-        if (slot) {
+        if (slot && weightSafe(slot.col, slot.row, v.w, v.h, cargo)) {
           commit(cargo.uid, slot.col, slot.row, v.w, v.h, v.rot);
           usedCells += v.w * v.h;
           placed_ = true;
           break;
         }
+        // If slot exists but weight fails, try to find another slot
+        // by scanning manually for a weight-safe position
+        if (slot && !weightSafe(slot.col, slot.row, v.w, v.h, cargo)) {
+          // Scan all rows bottom-up for a weight-safe slot
+          let found = false;
+          outerScan:
+          for (let row = ROWS - v.h; row >= 0; row--) {
+            for (let col = 0; col <= COLS - v.w; col++) {
+              if (canFit(col, row, v.w, v.h) && weightSafe(col, row, v.w, v.h, cargo)) {
+                commit(cargo.uid, col, row, v.w, v.h, v.rot);
+                usedCells += v.w * v.h;
+                placed_ = true;
+                found = true;
+                break outerScan;
+              }
+            }
+          }
+          if (found) break;
+        }
       }
-      if (!placed_) continue; // skip unplaceable items — don't abort
+      if (!placed_) continue;
       if (usedCells >= targetCells) break;
     }
     return { placed, usedCells, grid };
@@ -2942,16 +3029,20 @@ function drawCargo(ctx, cargo, col, row, cw, ch, PAD, CELL, invalid, iss) {
   const hasFloat = iss && iss.unsupported;
   const hasDrum  = iss && iss.unstableDrum;
   const hasDG    = iss && iss.dgConflict;
+  const hasOver  = iss && iss.overloaded;
+  const hasTopH  = iss && iss.topHeavy;
 
   // Determine fill/stroke based on warnings
   let fillColor = cargo.color;
   let strokeColor = cargo.stroke;
   let strokeW = 1.5;
-  if (invalid)   { fillColor = '#4a1a1a'; strokeColor = '#aa2a2a'; }
-  else if (hasCrush) { fillColor = '#4a2a1a'; strokeColor = '#e74c3c'; strokeW = 2; }
-  else if (hasFloat) { fillColor = '#2a1a2a'; strokeColor = '#e74c3c'; strokeW = 2; }
-  else if (hasDG)    { strokeColor = '#f39c12'; strokeW = 2.5; }
-  else if (hasDrum)  { strokeColor = '#f39c12'; strokeW = 2; }
+  if (invalid)     { fillColor = '#4a1a1a'; strokeColor = '#aa2a2a'; }
+  else if (hasCrush)  { fillColor = '#4a2a1a'; strokeColor = '#e74c3c'; strokeW = 2; }
+  else if (hasFloat)  { fillColor = '#2a1a2a'; strokeColor = '#e74c3c'; strokeW = 2; }
+  else if (hasOver)   { fillColor = '#3a1a0a'; strokeColor = '#ff6b00'; strokeW = 2.5; }
+  else if (hasTopH)   { strokeColor = '#9b59b6'; strokeW = 2; }
+  else if (hasDG)     { strokeColor = '#f39c12'; strokeW = 2.5; }
+  else if (hasDrum)   { strokeColor = '#f39c12'; strokeW = 2; }
 
   ctx.fillStyle = fillColor;
   ctx.strokeStyle = strokeColor;
@@ -3034,9 +3125,27 @@ function drawCargo(ctx, cargo, col, row, cw, ch, PAD, CELL, invalid, iss) {
     ctx.fillText('↓', x+2, y+2);
   }
   if (hasDrum) {
-    // Orange wobble dot
     ctx.fillStyle = '#f39c12';
     ctx.beginPath(); ctx.arc(x+pw-4, y+4, 3, 0, Math.PI*2); ctx.fill();
+  }
+  if (hasOver) {
+    // Orange heavy-weight indicator — overloaded support
+    ctx.save();
+    ctx.setLineDash([3, 2]);
+    ctx.strokeStyle = '#ff6b00';
+    ctx.lineWidth = 2;
+    roundRect(ctx, x+1, y+1, pw, ph, 3, false, true);
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#ff6b00';
+    ctx.font = `bold ${Math.max(8, CELL-14)}px sans-serif`;
+    ctx.textAlign = 'right'; ctx.textBaseline = 'top';
+    ctx.fillText('⚖', x+pw-1, y+1);
+    ctx.restore();
+  }
+  if (hasTopH && !hasOver) {
+    // Purple top-heavy dot — heavy above light
+    ctx.fillStyle = '#9b59b6';
+    ctx.beginPath(); ctx.arc(x+4, y+4, 3, 0, Math.PI*2); ctx.fill();
   }
   if (hasDG) {
     // Amber dashed border + ⚠ badge — DG separation risk
@@ -4158,10 +4267,11 @@ function executeShip(issueMap, forcedShip, isOverbooked) {
   const total = state.COLS * state.ROWS;
   let used = 0;
   let cargoValue = 0;
-  let crushDamage = 0;
-  let floatDamage = 0;
-  let drumDamage  = 0;
-  let dgPenalty   = 0;
+  let crushDamage    = 0;
+  let floatDamage    = 0;
+  let drumDamage     = 0;
+  let dgPenalty      = 0;
+  let overloadDamage = 0;
 
   state.cargo.forEach(cargo => {
     if (!state.placedCargo.has(cargo.uid)) return;
@@ -4175,7 +4285,9 @@ function executeShip(issueMap, forcedShip, isOverbooked) {
     if (iss.crushed)      crushDamage += cargo.value * 0.75;
     if (iss.unsupported)  floatDamage += cargo.value * 0.5;
     if (iss.unstableDrum) drumDamage  += cargo.value * 0.3;
-    if (iss.dgConflict)   dgPenalty   += cargo.value * 0.4; // 40% of each conflicting item
+    if (iss.dgConflict)   dgPenalty   += cargo.value * 0.4;
+    if (iss.overloaded)   overloadDamage += cargo.value * 0.35;
+    if (iss.topHeavy)     overloadDamage += cargo.value * 0.15;
   });
 
   const spacePct = used / total;
@@ -4199,10 +4311,11 @@ function executeShip(issueMap, forcedShip, isOverbooked) {
   const fastBonus = Math.round(cargoValue * fastBonusPct);
 
   const speedBonus  = 0; // retired — replaced by fastBonus
-  const crushLoss   = Math.round(crushDamage);
-  const floatLoss   = Math.round(floatDamage);
-  const drumLoss    = Math.round(drumDamage);
-  const dgLoss      = Math.round(dgPenalty);
+  const crushLoss    = Math.round(crushDamage);
+  const floatLoss    = Math.round(floatDamage);
+  const drumLoss     = Math.round(drumDamage);
+  const dgLoss       = Math.round(dgPenalty);
+  const overloadLoss = Math.round(overloadDamage);
   const unloadedLoss  = Math.round(unloadedValue * 0.8);
   const emptySpaceLoss = isOverbooked ? Math.round((1 - spacePct) * 3000) : 0;
   const forcePenalty  = forcedShip ? Math.round((crushLoss + floatLoss) * 0.25) : 0;
@@ -4222,11 +4335,11 @@ function executeShip(issueMap, forcedShip, isOverbooked) {
   const maximisedBonus = maximisedLoad ? 3000 : 0;
 
   const net = Math.max(0, cargoValue + spaceBonus + fastBonus + maximisedBonus
-    - crushLoss - floatLoss - drumLoss - dgLoss
+    - crushLoss - floatLoss - drumLoss - dgLoss - overloadLoss
     - unloadedLoss - emptySpaceLoss - forcePenalty - reworkLoss - delayCost - rejectionPenalty);
 
   const isPerfect = unloadedCargo.length === 0 && crushDamage === 0
-    && floatDamage === 0 && drumDamage === 0 && dgPenalty === 0
+    && floatDamage === 0 && drumDamage === 0 && dgPenalty === 0 && overloadDamage === 0
     && reworkLoss === 0 && delayCost === 0 && spacePct > 0.85;
   const isGood = net > 4000 || spacePct > 0.70;
   const isOk   = net > 2000;
@@ -4234,12 +4347,12 @@ function executeShip(issueMap, forcedShip, isOverbooked) {
   setTimeout(() => {
     if (isPerfect) showPerfectAnimation(() => showScoreScreen(
       net, cargoValue, spaceBonus, fastBonus,
-      crushLoss, floatLoss, drumLoss, dgLoss,
+      crushLoss, floatLoss, drumLoss, dgLoss, overloadLoss,
       unloadedLoss, emptySpaceLoss, forcePenalty, reworkLoss, delayCost, rejectionPenalty,
       unloadedCargo, isOverbooked, isPerfect, isGood, isOk, spacePct, maximisedLoad));
     else showScoreScreen(
       net, cargoValue, spaceBonus, fastBonus,
-      crushLoss, floatLoss, drumLoss, dgLoss,
+      crushLoss, floatLoss, drumLoss, dgLoss, overloadLoss,
       unloadedLoss, emptySpaceLoss, forcePenalty, reworkLoss, delayCost, rejectionPenalty,
       unloadedCargo, isOverbooked, isPerfect, isGood, isOk, spacePct, maximisedLoad);
   }, 300);
@@ -4256,7 +4369,7 @@ function showPerfectAnimation(cb) {
 }
 
 function showScoreScreen(net, cargoVal, spaceBonus, fastBonus,
-    crushLoss, floatLoss, drumLoss, dgLoss,
+    crushLoss, floatLoss, drumLoss, dgLoss, overloadLoss,
     unloadedLoss, emptySpaceLoss, forcePenalty, reworkLoss, delayCost, rejectionPenalty,
     unloadedCargo, isOverbooked, isPerfect, isGood, isOk, spacePct, maximisedLoad) {
 
@@ -4269,6 +4382,7 @@ function showScoreScreen(net, cargoVal, spaceBonus, fastBonus,
   const safeFloatLoss    = Number.isFinite(floatLoss)    ? floatLoss    : 0;
   const safeDrumLoss     = Number.isFinite(drumLoss)     ? drumLoss     : 0;
   const safeDGLoss       = Number.isFinite(dgLoss)       ? dgLoss       : 0;
+  const safeOverloadLoss = Number.isFinite(overloadLoss) ? overloadLoss : 0;
   const safeUnloadedLoss = Number.isFinite(unloadedLoss) ? unloadedLoss : 0;
   const safeEmptyLoss    = Number.isFinite(emptySpaceLoss) ? emptySpaceLoss : 0;
   const safeForce        = Number.isFinite(forcePenalty) ? forcePenalty : 0;
@@ -4283,7 +4397,7 @@ function showScoreScreen(net, cargoVal, spaceBonus, fastBonus,
   let gradeKey;
   try {
     gradeKey = computeGrade(safeNet, safeSpacePct, safeCrushLoss, safeFloatLoss,
-      safeDrumLoss, unloadedCount, safeDelay, safeRework, safeDGLoss);
+      safeDrumLoss, unloadedCount, safeDelay, safeRework, safeDGLoss, safeOverloadLoss);
   } catch (err) {
     console.warn('computeGrade error:', err);
     gradeKey = 'C'; // safe fallback
@@ -4333,6 +4447,7 @@ function showScoreScreen(net, cargoVal, spaceBonus, fastBonus,
   if (safeFloatLoss > 0)    rows.push(['Unsupported cargo damage',     `-$${safeFloatLoss.toLocaleString()}`,    'neg']);
   if (safeDrumLoss > 0)     rows.push(['Unstable drums',               `-$${safeDrumLoss.toLocaleString()}`,     'neg']);
   if (safeDGLoss > 0)       rows.push(['DG separation penalty',         `-$${safeDGLoss.toLocaleString()}`,      'neg']);
+  if (safeOverloadLoss > 0) rows.push(['Weight overload penalty',       `-$${safeOverloadLoss.toLocaleString()}`,'neg']);
   if (safeUnloadedLoss > 0) rows.push([`${unloadedCount} cargo left behind`, `-$${safeUnloadedLoss.toLocaleString()}`, 'neg']);
   if (safeEmptyLoss > 0)    rows.push(['Unused container space',       `-$${safeEmptyLoss.toLocaleString()}`,   'neg']);
   if (safeForce > 0)        rows.push(['Shipped with known risks',     `-$${safeForce.toLocaleString()}`,       'neg']);

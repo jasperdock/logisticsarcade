@@ -142,13 +142,17 @@ function pickEvent() {
   return pool[Math.floor(Math.random() * pool.length)];
 }
 
+// Map-side timer: COLD shows freshness decay, VIP shows countdown
+const COLD_FRESH_SECS = 40;   // COLD freshness window on map (before warehouse)
+const VIP_TIMEOUT_SECS = 35;  // VIP disappears if not collected in time
+
 const CARGO_TYPES = {
-  STANDARD:    { label: "STD",  color: "#4ADE80", textColor: "#000", capacity: 2, baseRevenue: 80,  dg: false, perishable: false },
-  PERISHABLE:  { label: "COLD", color: "#38BDF8", textColor: "#000", capacity: 2, baseRevenue: 120, dg: false, perishable: true  },
-  DG:          { label: "DG!",  color: "#F97316", textColor: "#fff", capacity: 3, baseRevenue: 200, dg: true,  perishable: false },
-  OVERSIZED:   { label: "BIG",  color: "#A78BFA", textColor: "#fff", capacity: 4, baseRevenue: 150, dg: false, perishable: false },
-  MISDECLARED: { label: "???",  color: "#FCD34D", textColor: "#000", capacity: 2, baseRevenue: 100, dg: false, perishable: false },
-  PRIORITY:    { label: "VIP",  color: "#FF1493", textColor: "#fff", capacity: 2, baseRevenue: 300, dg: false, perishable: false },
+  STANDARD:    { label: "STD",  color: "#4ADE80", textColor: "#000", capacity: 2, baseRevenue: 80,  dg: false, perishable: false, vip: false },
+  PERISHABLE:  { label: "COLD", color: "#38BDF8", textColor: "#000", capacity: 2, baseRevenue: 120, dg: false, perishable: true,  vip: false },
+  DG:          { label: "DG!",  color: "#F97316", textColor: "#fff", capacity: 3, baseRevenue: 200, dg: true,  perishable: false, vip: false },
+  OVERSIZED:   { label: "BIG",  color: "#A78BFA", textColor: "#fff", capacity: 5, baseRevenue: 150, dg: false, perishable: false, vip: false },
+  MISDECLARED: { label: "???",  color: "#FCD34D", textColor: "#000", capacity: 2, baseRevenue: 100, dg: false, perishable: false, vip: false },
+  PRIORITY:    { label: "VIP",  color: "#FF1493", textColor: "#fff", capacity: 2, baseRevenue: 300, dg: false, perishable: false, vip: true  },
 };
 
 const DELIVERY_POINTS = [
@@ -504,6 +508,7 @@ function CargoRun() {
         x: pos.x, y: pos.y,
         type: typeKey,
         actualCapacity: CARGO_TYPES[typeKey].capacity,
+        mapAge: 0,  // seconds on the map — used for COLD freshness & VIP countdown
       };
     });
     // Track potential revenue for new spawns
@@ -581,6 +586,7 @@ function CargoRun() {
         x: pos.x, y: pos.y,
         type: typeKey,
         actualCapacity: CARGO_TYPES[typeKey].capacity,
+        mapAge: 0,
       };
     });
     const initPotential = cargo.reduce((s, c) =>
@@ -657,6 +663,21 @@ function CargoRun() {
         return { ...m, x: nx, y: ny };
       }));
 
+      // age map cargo each second — COLD freshness, VIP countdown
+      setMapCargos(prev => {
+        const timedOut = prev.filter(c => CARGO_TYPES[c.type].vip && (c.mapAge || 0) >= VIP_TIMEOUT_SECS);
+        if (timedOut.length > 0) {
+          const penalty = timedOut.length * 200;
+          setPenalties(p => p + penalty);
+          setRevenue(r => Math.max(0, r - penalty));
+          setLostRevenue(l => l + penalty);
+          showPopup(`⭐ VIP contract missed! -£${penalty}`, 2500);
+        }
+        return prev
+          .filter(c => !(CARGO_TYPES[c.type].vip && (c.mapAge || 0) >= VIP_TIMEOUT_SECS))
+          .map(c => ({ ...c, mapAge: (c.mapAge || 0) + 1 }));
+      });
+
       // spawn map cargo if low (with contract weights)
       setMapCargos(prev => {
         if (prev.length < 5) {
@@ -672,7 +693,7 @@ function CargoRun() {
               ? pickCargoType(selectedContract.weights)
               : Object.keys(CARGO_TYPES).filter(k => k !== "PRIORITY")[Math.floor(Math.random() * 5)];
             return { id: Math.random().toString(36).slice(2), x: pos.x, y: pos.y,
-              type: typeKey, actualCapacity: CARGO_TYPES[typeKey].capacity };
+              type: typeKey, actualCapacity: CARGO_TYPES[typeKey].capacity, mapAge: 0 };
           });
           const newPot = spawned.reduce((s, c) =>
             s + Math.round(CARGO_TYPES[c.type].baseRevenue * (selectedContract?.revMod || 1)), 0);
@@ -802,6 +823,7 @@ function CargoRun() {
               x: pos.x, y: pos.y,
               type: "PRIORITY",
               actualCapacity: CARGO_TYPES.PRIORITY.capacity,
+              mapAge: 0,
             }]);
             // Add to potential revenue
             setPotentialRevenue(p => p + Math.round(300 * (selectedContract?.revMod || 1)));
@@ -845,6 +867,14 @@ function CargoRun() {
 
   useEffect(() => {
     tickRef.current = () => {
+      // BIG cargo speed penalty — every tick, slow interval if truck carries BIG
+      setTruckLoad(ld => {
+        const hasBig = ld.some(c => c.type === "OVERSIZED");
+        // Only slow during inbound (not outbound — different concern)
+        moveIntervalRef.current = hasBig ? 180 : (activeEvent?.id === "FAST_LANE" ? 96 : 120);
+        return ld;
+      });
+
       setFrozen(f => {
         if (f > 0) return f - 1;
 
@@ -906,12 +936,20 @@ function CargoRun() {
                     ? "DECLARED DIMENSIONS INCORRECT. Larger than stated."
                     : "DECLARED DIMENSIONS INCORRECT. Actually quite small.", 2000);
                 }
-                const customsChance = activeEvent?.id === "CUSTOMS_BLITZ" ? 0.5 : 0.2;
+                const customsChance = activeEvent?.id === "CUSTOMS_BLITZ" ? 0.55 : 0.30;
                 if (type.dg && Math.random() < customsChance) {
-                  setFrozen(activeEvent?.id === "CUSTOMS_BLITZ" ? 7 : 5);
+                  const dgEvents = [
+                    { freeze: 6,  msg: "🛃 Compliance Inspection. Vehicle held for documentation check." },
+                    { freeze: 8,  msg: "⚠ Restricted Route. Rerouting required. Delay applied." },
+                    { freeze: 4,  msg: "📋 Documentation Check. Paperwork reviewed. Brief delay." },
+                    { freeze: 10, msg: "🚨 DG Audit triggered. Full cargo manifest required." },
+                  ];
+                  const blitzBonus = activeEvent?.id === "CUSTOMS_BLITZ" ? 1 : 0;
+                  const ev = dgEvents[Math.floor(Math.random() * dgEvents.length)];
+                  setFrozen(ev.freeze + blitzBonus * 4);
                   showPopup(activeEvent?.id === "CUSTOMS_BLITZ"
-                    ? "🛃 CUSTOMS BLITZ: Extended inspection. -time."
-                    : "DG inspection triggered. Customs interested in your paperwork.", 2000);
+                    ? `🛃 CUSTOMS BLITZ: ${ev.msg}`
+                    : ev.msg, 2500);
                 }
 
                 setInboundCollected(c => c + 1);
@@ -1005,13 +1043,18 @@ function CargoRun() {
                   const base = Math.round(CARGO_TYPES[item.type].baseRevenue * revMod__);
                   if (CARGO_TYPES[item.type].perishable) {
                     const decay  = Math.min(1, (item.storedSecs || 0) / PERISH_EXPIRE_SECS);
-                    const earned = Math.round(base * (1 - decay) * 1.1);
+                    // Fresh bonus: +25% if delivered with less than 30% decay
+                    const freshBonus = decay < 0.30 ? 1.25 : 1.0;
+                    const earned = Math.round(base * (1 - decay) * freshBonus);
                     score += earned;
                     setPerishDelivered(d => d + 1);
                   } else if (CARGO_TYPES[item.type].dg) {
                     const earned = item.breached ? Math.round(base * 0.4) : Math.round(base * 1.2);
                     score += earned;
                     setDgCleared(d => d + 1);
+                  } else if (CARGO_TYPES[item.type].vip) {
+                    // VIP: full base + £500 bonus on delivery
+                    score += base + 500;
                   } else {
                     score += Math.round(base * 1.15);
                   }
@@ -1784,19 +1827,19 @@ function CargoRun() {
         <div style={{ display: "flex", gap: 4 }}>
           <DpadButton onClick={() => handleDpad({ x:-1, y:0 })} label="◄" />
           <div style={{
-            width: 52, height: 52, background: "#111", borderRadius: 8,
+            width: 64, height: 64, background: "#111", borderRadius: 10,
             border: "1px solid #1e1e2e", display: "flex", alignItems: "center", justifyContent: "center",
           }}>
-            <span style={{ fontSize: 18 }}>🚚</span>
+            <span style={{ fontSize: 22 }}>🚚</span>
           </div>
           <DpadButton onClick={() => handleDpad({ x:1, y:0 })} label="►" />
         </div>
         <DpadButton onClick={() => handleDpad({ x:0, y:1 })} label="▼" />
       </div>
 
-      {/* ARCADE HOME — fixed corner, always accessible */}
+      {/* ARCADE HOME — fixed top-right, clear of HUD score items */}
       <a href="index.html" style={{
-        position: "fixed", top: 10, left: 10, zIndex: 999,
+        position: "fixed", top: 10, right: 10, zIndex: 999,
         display: "flex", alignItems: "center", gap: 5,
         background: "#0d0d14", border: "1px solid #2a2a3a",
         borderRadius: 7, padding: "6px 10px",
@@ -1809,7 +1852,7 @@ function CargoRun() {
         onMouseEnter={e => { e.currentTarget.style.color="#FFD700"; e.currentTarget.style.borderColor="#FFD700"; }}
         onMouseLeave={e => { e.currentTarget.style.color="#555";    e.currentTarget.style.borderColor="#2a2a3a"; }}
       >
-        ← ARCADE
+        ARCADE →
       </a>
 
       <style>{`
@@ -1890,12 +1933,38 @@ function GameCanvas({ map, player, cargos, movers, load, frozen,
       {cargos.map(c => {
         const type = CARGO_TYPES[c.type];
         const cx = c.x*TILE+TILE/2, cy = c.y*TILE+TILE/2;
+        const mapAge = c.mapAge || 0;
+
+        // COLD freshness: decay bar shrinks over COLD_FRESH_SECS
+        const isCold = type.perishable;
+        const coldDecay = isCold ? Math.min(1, mapAge / COLD_FRESH_SECS) : 0;
+        const coldBarW  = isCold ? Math.max(0, (1 - coldDecay) * (TILE - 12)) : 0;
+        const coldColor = coldDecay > 0.6 ? "#F87171" : coldDecay > 0.3 ? "#FCD34D" : "#38BDF8";
+
+        // VIP countdown: timer bar shrinks over VIP_TIMEOUT_SECS
+        const isVip = type.vip;
+        const vipDecay = isVip ? Math.min(1, mapAge / VIP_TIMEOUT_SECS) : 0;
+        const vipBarW  = isVip ? Math.max(0, (1 - vipDecay) * (TILE - 12)) : 0;
+        const vipColor = vipDecay > 0.6 ? "#F87171" : "#FF1493";
+
+        // Pulse for urgent COLD or VIP
+        const urgent = (isCold && coldDecay > 0.6) || (isVip && vipDecay > 0.5);
+        const stroke = urgent ? (isCold ? "#F87171" : "#FF1493") : "rgba(255,255,255,0.1)";
+
         return (
           <g key={c.id}>
             <rect x={c.x*TILE+6} y={c.y*TILE+6} width={TILE-12} height={TILE-12}
-              rx={4} fill={type.color} stroke="rgba(255,255,255,0.1)" strokeWidth={1} />
+              rx={4} fill={type.color} stroke={stroke} strokeWidth={urgent ? 2 : 1} />
             <text x={cx} y={cy} textAnchor="middle" dominantBaseline="middle"
               fill={type.textColor} fontSize={9} fontFamily="'Courier New'" fontWeight="700">{type.label}</text>
+            {isCold && coldBarW > 0 && (
+              <rect x={c.x*TILE+6} y={c.y*TILE+TILE-10} width={coldBarW} height={3}
+                rx={1} fill={coldColor} opacity={0.9} />
+            )}
+            {isVip && (
+              <rect x={c.x*TILE+6} y={c.y*TILE+TILE-10} width={vipBarW} height={3}
+                rx={1} fill={vipColor} opacity={0.9} />
+            )}
           </g>
         );
       })}
@@ -1985,8 +2054,8 @@ function DpadButton({ onClick, label }) {
       onMouseDown={onClick}
       onTouchEnd={e => e.preventDefault()}
       style={{
-        width: 52, height: 52, background: "#111", border: "1px solid #1e1e2e",
-        borderRadius: 8, color: "#FFD700", fontSize: 20, cursor: "pointer",
+        width: 64, height: 64, background: "#111", border: "1px solid #1e1e2e",
+        borderRadius: 10, color: "#FFD700", fontSize: 24, cursor: "pointer",
         display: "flex", alignItems: "center", justifyContent: "center",
         WebkitTapHighlightColor: "transparent", touchAction: "none",
       }}
