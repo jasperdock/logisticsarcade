@@ -1,5 +1,5 @@
 ---
-name: Feature Request
+name: Suggest an Improvement
 about: Suggest a new gameplay feature.
 title: "[FEATURE] "
 labels: enhancement
