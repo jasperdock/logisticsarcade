@@ -1368,7 +1368,16 @@
       <span>LOGISTICS ARCADE</span> © 2026 · CONTAINER STUFFER · <span>v0.1</span>
     </div>
     <div class="arcade-footer-links">
-      <a href="index.html">← ARCADE HOME</a>
+      <a href="index.html" style="
+        display:inline-flex;align-items:center;gap:6px;
+        background:var(--panel2);border:1px solid var(--accent);border-radius:6px;
+        padding:10px 20px;
+        font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;
+        letter-spacing:2px;color:var(--accent);text-decoration:none;
+        transition:background 0.12s;-webkit-tap-highlight-color:transparent;
+      ">🎮 RETURN TO ARCADE</a>
+    </div>
+    <div class="arcade-footer-links" style="margin-top:4px">
       <a href="https://github.com/jasperdock/logisticsarcade" target="_blank" rel="noopener">GITHUB ↗</a>
     </div>
     <div style="font-family:'Share Tech Mono',monospace;font-size:8px;color:var(--text3);letter-spacing:1px;margin-top:2px">
@@ -1397,20 +1406,18 @@
     <div class="return-modal-body">Current shipment progress will be lost.<br>Total session score is preserved.</div>
     <div class="return-modal-actions">
       <button class="return-btn-cancel" onclick="cancelReturnToMenu()">← STAY</button>
-      <button class="return-btn-confirm" onclick="executeReturnToMenu()">RETURN TO MENU</button>
+      <button class="return-btn-confirm" onclick="executeReturnToMenu()">GAME MENU</button>
     </div>
     <a href="index.html" style="
-      display:block;
+      display:flex;align-items:center;justify-content:center;gap:6px;
       margin-top:10px;
-      text-align:center;
-      font-family:'Share Tech Mono',monospace;
-      font-size:10px;
-      letter-spacing:2px;
-      color:var(--text3);
-      text-decoration:none;
-      padding:8px;
-      border-top:1px solid var(--border);
-    ">← ARCADE HOME</a>
+      background:rgba(232,160,32,0.08);
+      border:1px solid var(--accent);border-radius:6px;
+      padding:11px;
+      font-family:'Rajdhani',sans-serif;font-size:15px;font-weight:700;
+      letter-spacing:2px;color:var(--accent);text-decoration:none;
+      transition:background 0.12s;-webkit-tap-highlight-color:transparent;
+    ">🎮 RETURN TO ARCADE</a>
   </div>
 </div>
   <!-- Vessel Cut-Off strip (hidden when no cutoff applies) -->
@@ -1547,7 +1554,15 @@
   </div>
   <div class="score-actions">
     <button class="btn-primary" onclick="nextRound()">NEXT SHIPMENT ›</button>
-    <button class="btn-secondary" onclick="goTitle()">← BACK TO PORT</button>
+    <a href="index.html" style="
+      display:flex;align-items:center;justify-content:center;gap:6px;
+      background:var(--panel);border:1px solid var(--accent);border-radius:6px;
+      padding:12px;width:100%;
+      font-family:'Rajdhani',sans-serif;font-size:16px;font-weight:700;
+      letter-spacing:2px;color:var(--accent);text-decoration:none;
+      transition:background 0.12s;-webkit-tap-highlight-color:transparent;
+    ">🎮 RETURN TO ARCADE</a>
+    <button class="btn-secondary" onclick="goTitle()">GAME MENU</button>
   </div>
 </div>
 

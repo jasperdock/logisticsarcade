@@ -614,6 +614,105 @@
       border-color: rgba(111, 168, 220, 0.5);
     }
 
+    /* ── Community feedback section ─────────────────────── */
+    .community {
+      padding: 64px 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .community-inner {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 32px;
+      align-items: start;
+    }
+
+    @media (min-width: 700px) {
+      .community-inner { grid-template-columns: 1fr 1fr; gap: 56px; align-items: center; }
+    }
+
+    .community-body { display: flex; flex-direction: column; gap: 12px; }
+
+    .community-body p {
+      font-size: 14.5px;
+      color: var(--body);
+      line-height: 1.7;
+    }
+
+    .community-questions {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      margin-bottom: 4px;
+    }
+
+    .community-questions li {
+      font-size: 14px;
+      color: var(--muted);
+      padding-left: 20px;
+      position: relative;
+    }
+
+    .community-questions li::before {
+      content: '▸';
+      position: absolute;
+      left: 0;
+      color: var(--amber-dim);
+    }
+
+    .community-action {
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+      align-items: flex-start;
+    }
+
+    @media (min-width: 700px) {
+      .community-action { align-items: flex-start; }
+    }
+
+    .dispatch-notice {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--amber-dim);
+      border-radius: 4px;
+      padding: 16px 18px;
+      width: 100%;
+    }
+
+    .dispatch-notice-header {
+      font-family: var(--font-display);
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.2em;
+      text-transform: uppercase;
+      color: var(--amber-dim);
+      margin-bottom: 10px;
+    }
+
+    .dispatch-notice-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+
+    .dispatch-notice-list li {
+      font-size: 12.5px;
+      color: var(--muted);
+      padding-left: 16px;
+      position: relative;
+      line-height: 1.5;
+    }
+
+    .dispatch-notice-list li::before {
+      content: '•';
+      position: absolute;
+      left: 0;
+      color: var(--border);
+    }
+
     /* ── Reduced motion ──────────────────────────────────── */
     @media (prefers-reduced-motion: reduce) {
       *, *::before, *::after { transition: none !important; }
@@ -794,6 +893,44 @@
     </section>
 
   </main>
+
+  <!-- ── Community feedback ────────────────────────────── -->
+  <section class="community" aria-labelledby="community-heading">
+    <div class="container">
+      <div class="community-inner">
+
+        <div class="community-body">
+          <p class="section-label">💬 Community</p>
+          <h2 class="section-title" id="community-heading" style="margin-bottom: 16px;">Help Improve<br>Logistics Arcade</h2>
+          <ul class="community-questions">
+            <li>Found a bug?</li>
+            <li>Got an idea for a new logistics challenge?</li>
+            <li>Think you've discovered a better way to load a container?</li>
+          </ul>
+          <p>
+            Logistics Arcade is an active project and every suggestion helps shape future games.
+            Report bugs, request features or share your ideas on GitHub.
+          </p>
+        </div>
+
+        <div class="community-action">
+          <a class="btn btn--primary" href="https://github.com/jasperdock/logisticsarcade/issues" target="_blank" rel="noopener noreferrer" style="font-size: 14px; padding: 13px 24px;">
+            💬 Leave Feedback on GitHub
+          </a>
+
+          <div class="dispatch-notice" role="note" aria-label="Operations Warning">
+            <p class="dispatch-notice-header">⚠ Dispatch Notice — Operations Warning</p>
+            <ul class="dispatch-notice-list">
+              <li>Optimising supermarket trolleys</li>
+              <li>Judging poorly loaded vans</li>
+              <li>Becoming irrationally annoyed by wasted container space</li>
+            </ul>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </section>
 
   <!-- ── Footer ────────────────────────────────────────── -->
   <footer class="site-footer" role="contentinfo">
