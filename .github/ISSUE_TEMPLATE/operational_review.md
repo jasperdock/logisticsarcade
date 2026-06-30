@@ -1,5 +1,5 @@
 ---
-name: Gameplay Balance
+name: Operational Review
 about: Suggest balancing improvements.
 title: "[BALANCE] "
 labels: balancing
